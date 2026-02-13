@@ -1,10 +1,11 @@
 import { BaseAgent } from './BaseAgent.js';
 import Anthropic from '@anthropic-ai/sdk';
+import { GoogleGenerativeAI } from '@google/generative-ai';
 import { logger } from '../utils/logger.js';
 
 /**
  * Translation Agent - Autonomous multi-language translation
- * Uses Claude AI for high-quality translations
+ * Uses Gemini AI (primary) and Claude AI (fallback) for high-quality translations
  */
 export class TranslationAgent extends BaseAgent {
   constructor() {
@@ -14,6 +15,8 @@ export class TranslationAgent extends BaseAgent {
     });
 
     this.anthropic = null;
+    this.gemini = null;
+    this.geminiModel = null;
     this.supportedLanguages = [
       { code: 'hi', name: 'Hindi' },
       { code: 'ta', name: 'Tamil' },
@@ -29,20 +32,28 @@ export class TranslationAgent extends BaseAgent {
   async initialize() {
     await super.initialize();
 
+    // Initialize Gemini (primary for regional languages)
+    if (process.env.GEMINI_API_KEY && process.env.GEMINI_API_KEY !== 'your_gemini_api_key_here') {
+      this.gemini = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
+      this.geminiModel = this.gemini.getGenerativeModel({ model: 'gemini-1.5-flash' });
+      logger.info('[TranslationAgent] 🌟 Gemini AI initialized (primary) for regional language translations');
+    }
+
+    // Initialize Claude (fallback)
     this.anthropic = new Anthropic({
       apiKey: process.env.ANTHROPIC_API_KEY
     });
 
-    logger.info('[TranslationAgent] Claude AI initialized for translations');
+    logger.info('[TranslationAgent] Claude AI initialized (fallback) for translations');
   }
 
   /**
-   * Execute: Translate news to multiple languages using Claude
+   * Execute: Translate news to multiple languages using BOTH Gemini AND Claude for comparison
    */
   async execute(task) {
     const { headline } = task;
 
-    logger.info(`[TranslationAgent] Translating: ${headline.title} to 8 languages using Claude`);
+    logger.info(`[TranslationAgent] 🔄 Comparing translations: ${headline.title} (Gemini vs Claude)`);
 
     const translations = [];
 
@@ -61,22 +72,56 @@ export class TranslationAgent extends BaseAgent {
       }
     });
 
-    logger.info(`[TranslationAgent] ✅ Translated to ${translations.length}/8 languages`);
+    // Count successful translations
+    const geminiSuccess = translations.filter(t => t.geminiQuality > 0).length;
+    const claudeSuccess = translations.filter(t => t.claudeQuality > 0).length;
+
+    logger.info(`[TranslationAgent] ✅ Translation comparison complete: ${translations.length}/8 languages (Gemini: ${geminiSuccess}/8, Claude: ${claudeSuccess}/8)`);
 
     return {
       ...headline,
       translations,
-      translatedAt: new Date()
+      translatedAt: new Date(),
+      comparisonMode: true
     };
   }
 
   /**
-   * Translate to a specific language using Claude
+   * Translate to a specific language using BOTH Gemini AND Claude for comparison
    */
   async translateToLanguage(headline, targetLang) {
-    try {
-      const textToTranslate = headline.summary || headline.description || headline.title;
+    const textToTranslate = headline.summary || headline.description || headline.title;
+    const translations = {};
 
+    // Translate with Gemini
+    if (this.geminiModel) {
+      try {
+        const prompt = `Translate the following English news text to ${targetLang.name} language. Provide ONLY the translation in ${targetLang.name} script, no explanations:
+
+"${textToTranslate}"`;
+
+        const result = await this.geminiModel.generateContent(prompt);
+        const translatedText = result.response.text().trim();
+
+        translations.gemini = {
+          text: translatedText,
+          quality: 98,
+          provider: 'gemini'
+        };
+
+      } catch (error) {
+        logger.warn(`[TranslationAgent] Gemini error for ${targetLang.name}:`, error.message);
+        translations.gemini = {
+          text: '[Gemini unavailable]',
+          quality: 0,
+          provider: 'gemini',
+          error: true
+        };
+      }
+    }
+
+    // Translate with Claude
+    try {
       const prompt = `Translate the following English news text to ${targetLang.name} (${targetLang.code}):
 
 "${textToTranslate}"
@@ -91,28 +136,33 @@ Provide ONLY the translation, no explanations or additional text.`;
 
       const translatedText = response.content[0].text.trim();
 
-      return {
-        language: targetLang.code,
-        languageName: targetLang.name,
-        title: headline.title,
-        summary: translatedText,
-        quality: 95, // Claude provides high-quality translations
+      translations.claude = {
+        text: translatedText,
+        quality: 95,
         provider: 'claude'
       };
 
     } catch (error) {
-      logger.error(`[TranslationAgent] Claude API error for ${targetLang.name}:`, error.message);
-
-      // Return error placeholder
-      return {
-        language: targetLang.code,
-        languageName: targetLang.name,
-        title: headline.title,
-        summary: `[Translation unavailable]`,
+      logger.error(`[TranslationAgent] Claude error for ${targetLang.name}:`, error.message);
+      translations.claude = {
+        text: '[Claude unavailable]',
         quality: 0,
-        provider: 'error'
+        provider: 'claude',
+        error: true
       };
     }
+
+    // Return both translations for comparison
+    return {
+      language: targetLang.code,
+      languageName: targetLang.name,
+      title: headline.title,
+      geminiTranslation: translations.gemini?.text || '[Not available]',
+      claudeTranslation: translations.claude?.text || '[Not available]',
+      geminiQuality: translations.gemini?.quality || 0,
+      claudeQuality: translations.claude?.quality || 0,
+      comparison: true
+    };
   }
 
   /**

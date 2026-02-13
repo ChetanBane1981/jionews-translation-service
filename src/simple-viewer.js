@@ -266,7 +266,7 @@ app.get('/', (req, res) => {
         <header>
             <h1>🔴 JioNews Live Feed <span class="live-indicator"></span></h1>
             <p style="color: #6c757d; margin-top: 10px; font-size: 1.1em;">
-                🤖 Fully Automated • Real-time news from 2 publishers (CNN & BBC) • Auto-refresh every 30s
+                🔄 AI Comparison Mode • Gemini vs Claude • Real-time news from 2 publishers • Auto-refresh every 30s
             </p>
             <div class="stats">
                 <div class="stat-box">
@@ -274,8 +274,12 @@ app.get('/', (req, res) => {
                     <div class="stat-label">Headlines Processed</div>
                 </div>
                 <div class="stat-box">
-                    <div class="stat-number">8</div>
-                    <div class="stat-label">Languages (Claude AI)</div>
+                    <div class="stat-number">8x2</div>
+                    <div class="stat-label">Translations (Gemini vs Claude)</div>
+                </div>
+                <div class="stat-box">
+                    <div class="stat-number">2</div>
+                    <div class="stat-label">AI Models Compared</div>
                 </div>
                 <div class="stat-box">
                     <div class="stat-number">60</div>
@@ -283,7 +287,7 @@ app.get('/', (req, res) => {
                 </div>
                 <div class="stat-box">
                     <div class="stat-number">LIVE</div>
-                    <div class="stat-label">Automated Status</div>
+                    <div class="stat-label">Comparison Mode</div>
                 </div>
             </div>
             <button class="refresh-btn" onclick="location.reload()">🔄 Refresh Now</button>
@@ -310,15 +314,36 @@ app.get('/', (req, res) => {
 
                     ${news.translations && news.translations.length > 0 ? `
                         <div style="margin-top: 15px; padding-top: 15px; border-top: 1px solid #e9ecef;">
-                            <strong style="color: #667eea; font-size: 0.9em; display: block; margin-bottom: 10px;">🌐 TRANSLATIONS (${news.translations.length} languages)</strong>
+                            <strong style="color: #667eea; font-size: 0.9em; display: block; margin-bottom: 10px;">🔄 AI TRANSLATION COMPARISON (${news.translations.length} languages)</strong>
                             <details style="margin-top: 10px;">
-                                <summary style="cursor: pointer; color: #667eea; font-weight: 500;">View Translations</summary>
-                                <div style="margin-top: 10px; max-height: 300px; overflow-y: auto;">
+                                <summary style="cursor: pointer; color: #667eea; font-weight: 500;">Compare Gemini vs Claude →</summary>
+                                <div style="margin-top: 15px; max-height: 400px; overflow-y: auto;">
                                     ${news.translations.slice(0, 5).map(t => `
-                                        <div style="background: #f8f9fa; padding: 10px; margin: 8px 0; border-radius: 8px;">
-                                            <strong style="color: #667eea;">${t.languageName || t.language}</strong>
-                                            <p style="margin-top: 5px; color: #495057; font-size: 0.9em;">${t.summary || t.title}</p>
-                                            ${t.quality ? `<span style="font-size: 0.8em; color: #6c757d;">Quality: ${t.quality}%</span>` : ''}
+                                        <div style="background: #f8f9fa; padding: 15px; margin: 12px 0; border-radius: 10px; border-left: 4px solid #667eea;">
+                                            <strong style="color: #667eea; font-size: 1.1em; display: block; margin-bottom: 12px;">📍 ${t.languageName || t.language}</strong>
+
+                                            <!-- Gemini Translation -->
+                                            <div style="background: white; padding: 12px; margin: 8px 0; border-radius: 8px; border-left: 3px solid #4285f4;">
+                                                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                                                    <span style="background: #4285f4; color: white; padding: 4px 12px; border-radius: 12px; font-size: 0.8em; font-weight: 600;">🌟 GEMINI</span>
+                                                    ${t.geminiQuality ? `<span style="font-size: 0.8em; color: ${t.geminiQuality > 90 ? '#28a745' : '#ffc107'}; font-weight: 600;">Quality: ${t.geminiQuality}%</span>` : ''}
+                                                </div>
+                                                <p style="color: #2c3e50; font-size: 0.95em; line-height: 1.6;">${t.geminiTranslation || t.summary || '[Not available]'}</p>
+                                            </div>
+
+                                            <!-- Claude Translation -->
+                                            <div style="background: white; padding: 12px; margin: 8px 0; border-radius: 8px; border-left: 3px solid #667eea;">
+                                                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                                                    <span style="background: #667eea; color: white; padding: 4px 12px; border-radius: 12px; font-size: 0.8em; font-weight: 600;">🤖 CLAUDE</span>
+                                                    ${t.claudeQuality ? `<span style="font-size: 0.8em; color: ${t.claudeQuality > 90 ? '#28a745' : '#ffc107'}; font-weight: 600;">Quality: ${t.claudeQuality}%</span>` : ''}
+                                                </div>
+                                                <p style="color: #2c3e50; font-size: 0.95em; line-height: 1.6;">${t.claudeTranslation || t.summary || '[Not available]'}</p>
+                                            </div>
+
+                                            <!-- Comparison Note -->
+                                            <div style="text-align: center; margin-top: 10px; padding: 8px; background: #fff3cd; border-radius: 6px;">
+                                                <span style="font-size: 0.85em; color: #856404;">💡 Compare both translations above</span>
+                                            </div>
                                         </div>
                                     `).join('')}
                                 </div>
