@@ -35,8 +35,9 @@ export class TranslationAgent extends BaseAgent {
     // Initialize Gemini (primary for regional languages)
     if (process.env.GEMINI_API_KEY && process.env.GEMINI_API_KEY !== 'your_gemini_api_key_here') {
       this.gemini = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-      this.geminiModel = this.gemini.getGenerativeModel({ model: 'gemini-1.5-flash' });
-      logger.info('[TranslationAgent] 🌟 Gemini AI initialized (primary) for regional language translations');
+      // Try Gemini 2.0 Flash experimental model
+      this.geminiModel = this.gemini.getGenerativeModel({ model: 'gemini-2.0-flash-exp' });
+      logger.info('[TranslationAgent] 🌟 Gemini AI initialized (primary) using gemini-2.0-flash-exp');
     }
 
     // Initialize Claude (fallback)
@@ -110,7 +111,12 @@ export class TranslationAgent extends BaseAgent {
         };
 
       } catch (error) {
-        logger.warn(`[TranslationAgent] Gemini error for ${targetLang.name}:`, error.message);
+        logger.error(`[TranslationAgent] Gemini error for ${targetLang.name}:`, {
+          message: error.message,
+          name: error.name,
+          stack: error.stack?.split('\n')[0],
+          fullError: JSON.stringify(error, Object.getOwnPropertyNames(error))
+        });
         translations.gemini = {
           text: '[Gemini unavailable]',
           quality: 0,
