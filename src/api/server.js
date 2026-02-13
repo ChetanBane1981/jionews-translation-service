@@ -1,10 +1,13 @@
 import express from 'express';
 import cors from 'cors';
+import { fileURLToPath } from 'url';
 import { logger } from '../utils/logger.js';
 import { database } from '../utils/database.js';
 import { queueManager } from '../services/queue.js';
 import { healthMonitor } from '../monitoring/health.js';
 import { NewsItem, UserProfile, AgentLog } from '../models/index.js';
+
+const __filename = fileURLToPath(import.meta.url);
 
 /**
  * REST API Server for JioNews Sentinel
@@ -334,17 +337,31 @@ class APIServer {
 }
 
 // Start server if run directly
-if (import.meta.url === `file://${process.argv[1]}`) {
+if (process.argv[1] === __filename) {
   const port = process.env.PORT || 3000;
   const server = new APIServer(port);
 
-  server.start().catch((error) => {
-    logger.error('[API] Startup failed:', error);
-    process.exit(1);
-  });
+  console.log('Starting API server...');
+
+  server.start()
+    .then(() => {
+      logger.info('Server started successfully');
+    })
+    .catch((error) => {
+      logger.error('[API] Startup failed:', error);
+      console.error('Error details:', error);
+      process.exit(1);
+    });
 
   // Graceful shutdown
   process.on('SIGINT', async () => {
+    console.log('\nShutting down gracefully...');
+    await server.stop();
+    process.exit(0);
+  });
+
+  process.on('SIGTERM', async () => {
+    console.log('\nShutting down gracefully...');
     await server.stop();
     process.exit(0);
   });
