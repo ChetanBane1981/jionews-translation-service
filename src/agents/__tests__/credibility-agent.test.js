@@ -1,291 +1,344 @@
 import { CredibilityAgent } from '../credibility-agent.js';
 
+// Mock logger
+jest.mock('../../utils/logger.js', () => ({
+  logger: {
+    info: jest.fn(),
+    error: jest.fn(),
+    warn: jest.fn()
+  }
+}));
+
+// Mock Anthropic SDK
+jest.mock('@anthropic-ai/sdk', () => {
+  return jest.fn().mockImplementation(() => ({
+    messages: {
+      create: jest.fn()
+    }
+  }));
+});
+
 describe('CredibilityAgent', () => {
   let agent;
-  let mockConfig;
 
   beforeEach(() => {
-    mockConfig = {
-      anthropicApiKey: 'test-key',
-      credibilityThresholds: {
-        autoPublish: 70,
-        requireApproval: 50
-      }
-    };
-    agent = new CredibilityAgent(mockConfig);
+    agent = new CredibilityAgent();
+    process.env.ANTHROPIC_API_KEY = 'test-key';
+    process.env.CREDIBILITY_THRESHOLD = '70';
   });
 
   afterEach(() => {
-    if (agent) {
+    if (agent && agent.status !== 'shutdown') {
       agent.shutdown();
     }
+    delete process.env.ANTHROPIC_API_KEY;
+    delete process.env.CREDIBILITY_THRESHOLD;
   });
 
   describe('Initialization', () => {
     test('should create agent with correct name', () => {
-      expect(agent.name).toBe('credibility');
+      expect(agent.name).toBe('CredibilityAgent');
     });
 
-    test('should set credibility thresholds from config', () => {
-      expect(agent.credibilityThresholds.autoPublish).toBe(70);
-      expect(agent.credibilityThresholds.requireApproval).toBe(50);
-    });
-  });
-
-  describe('Source Trust Scoring', () => {
-    test('should give high trust score to reputable sources', () => {
-      const headline = {
-        sourceName: 'Reuters',
-        sourceUrl: 'https://reuters.com'
-      };
-      const score = agent.calculateSourceTrustScore(headline);
-      expect(score).toBeGreaterThanOrEqual(80);
+    test('should have autoRetry enabled', () => {
+      expect(agent.config.autoRetry).toBe(true);
     });
 
-    test('should give medium trust score to regional sources', () => {
-      const headline = {
-        sourceName: 'Times of India',
-        sourceUrl: 'https://timesofindia.com'
-      };
-      const score = agent.calculateSourceTrustScore(headline);
-      expect(score).toBeGreaterThanOrEqual(60);
+    test('should have correct model configured', () => {
+      expect(agent.config.model).toBe('claude-sonnet-4-5-20250929');
     });
 
-    test('should give low trust score to unknown sources', () => {
-      const headline = {
-        sourceName: 'Unknown Blog',
-        sourceUrl: 'https://unknown-site.com'
-      };
-      const score = agent.calculateSourceTrustScore(headline);
-      expect(score).toBeLessThanOrEqual(40);
-    });
-
-    test('should handle missing source information', () => {
-      const headline = {};
-      const score = agent.calculateSourceTrustScore(headline);
-      expect(score).toBe(30);
+    test('should initialize anthropic client on initialize', async () => {
+      await agent.initialize();
+      expect(agent.anthropic).toBeTruthy();
+      expect(agent.status).toBe('ready');
     });
   });
 
-  describe('Red Flag Detection', () => {
-    test('should detect clickbait phrases', () => {
-      const headline = {
-        title: 'You won\'t believe what happened next!',
-        description: 'Click to find out'
-      };
-      const redFlags = agent.detectRedFlags(headline);
-      expect(redFlags).toContain('Clickbait language detected');
+  describe('Response Parsing', () => {
+    test('should parse valid JSON response', () => {
+      const jsonResponse = JSON.stringify({
+        credibilityScore: 85,
+        fakeRisk: 'Low',
+        trustScore: 90,
+        reasoning: 'High credibility source',
+        redFlags: []
+      });
+
+      const result = agent.parseResponse(jsonResponse);
+
+      expect(result.credibilityScore).toBe(85);
+      expect(result.fakeRisk).toBe('Low');
+      expect(result.trustScore).toBe(90);
+      expect(result.reasoning).toBe('High credibility source');
+      expect(result.redFlags).toEqual([]);
     });
 
-    test('should detect ALL CAPS', () => {
-      const headline = {
-        title: 'BREAKING: SHOCKING NEWS EVERYONE MUST SEE'
-      };
-      const redFlags = agent.detectRedFlags(headline);
-      expect(redFlags).toContain('Excessive capitalization');
+    test('should extract JSON from text with surrounding content', () => {
+      const response = `Here is my analysis:
+
+      {"credibilityScore": 60, "fakeRisk": "Medium", "trustScore": 65, "reasoning": "Mixed signals", "redFlags": ["clickbait"]}
+
+      That concludes the analysis.`;
+
+      const result = agent.parseResponse(response);
+
+      expect(result.credibilityScore).toBe(60);
+      expect(result.fakeRisk).toBe('Medium');
+      expect(result.redFlags).toContain('clickbait');
     });
 
-    test('should detect excessive punctuation', () => {
-      const headline = {
-        title: 'Breaking News!!!! Must Read!!!'
-      };
-      const redFlags = agent.detectRedFlags(headline);
-      expect(redFlags).toContain('Excessive punctuation');
+    test('should return default values on parse error', () => {
+      const invalidResponse = 'This is not JSON at all';
+
+      const result = agent.parseResponse(invalidResponse);
+
+      expect(result.credibilityScore).toBe(50);
+      expect(result.fakeRisk).toBe('Medium');
+      expect(result.trustScore).toBe(50);
+      expect(result.reasoning).toBe('Default analysis');
+      expect(result.redFlags).toEqual([]);
     });
 
-    test('should detect sensational words', () => {
-      const headline = {
-        title: 'Miracle cure discovered',
-        description: 'Secret doctors don\'t want you to know'
-      };
-      const redFlags = agent.detectRedFlags(headline);
-      expect(redFlags.length).toBeGreaterThan(0);
+    test('should handle malformed JSON gracefully', () => {
+      const malformedJson = '{"credibilityScore": 80, "fakeRisk": "Low"'; // Missing closing brace
+
+      const result = agent.parseResponse(malformedJson);
+
+      // Should return defaults since JSON is malformed
+      expect(result).toHaveProperty('credibilityScore');
+      expect(result).toHaveProperty('fakeRisk');
     });
 
-    test('should return empty array for clean content', () => {
-      const headline = {
-        title: 'Government announces new policy',
-        description: 'Official statement from ministry'
-      };
-      const redFlags = agent.detectRedFlags(headline);
-      expect(redFlags.length).toBe(0);
-    });
-  });
+    test('should handle empty response', () => {
+      const result = agent.parseResponse('');
 
-  describe('Credibility Scoring', () => {
-    test('should calculate high credibility for quality content', () => {
-      const headline = {
-        sourceName: 'Reuters',
-        sourceUrl: 'https://reuters.com',
-        title: 'Government announces new policy',
-        description: 'Official statement released today',
-        author: 'John Smith'
-      };
-      const score = agent.calculateCredibilityScore(headline, []);
-      expect(score).toBeGreaterThanOrEqual(70);
-    });
-
-    test('should reduce score for content with red flags', () => {
-      const headline = {
-        sourceName: 'Reuters',
-        sourceUrl: 'https://reuters.com',
-        title: 'You won\'t believe this!!!',
-        description: 'SHOCKING revelation'
-      };
-      const redFlags = agent.detectRedFlags(headline);
-      const score = agent.calculateCredibilityScore(headline, redFlags);
-      expect(score).toBeLessThan(70);
-    });
-
-    test('should give low score to unknown sources with red flags', () => {
-      const headline = {
-        sourceName: 'Unknown',
-        title: 'BREAKING: Miracle cure found!!!',
-        description: 'Doctors hate this trick'
-      };
-      const redFlags = agent.detectRedFlags(headline);
-      const score = agent.calculateCredibilityScore(headline, redFlags);
-      expect(score).toBeLessThan(50);
-    });
-
-    test('should bonus for having author', () => {
-      const headline1 = {
-        sourceName: 'Test Source',
-        title: 'Test',
-        author: 'John Doe'
-      };
-      const headline2 = {
-        sourceName: 'Test Source',
-        title: 'Test'
-      };
-      const score1 = agent.calculateCredibilityScore(headline1, []);
-      const score2 = agent.calculateCredibilityScore(headline2, []);
-      expect(score1).toBeGreaterThan(score2);
+      expect(result.credibilityScore).toBe(50);
+      expect(result.fakeRisk).toBe('Medium');
     });
   });
 
-  describe('Fake Risk Assessment', () => {
-    test('should classify high credibility as Low risk', () => {
-      const score = 85;
-      const risk = agent.assessFakeRisk(score);
-      expect(risk).toBe('Low');
+  describe('Execute Method', () => {
+    beforeEach(async () => {
+      await agent.initialize();
     });
 
-    test('should classify medium credibility as Medium risk', () => {
-      const score = 60;
-      const risk = agent.assessFakeRisk(score);
-      expect(risk).toBe('Medium');
-    });
+    test('should process headline and call Claude API', async () => {
+      const mockResponse = {
+        content: [{
+          text: JSON.stringify({
+            credibilityScore: 75,
+            fakeRisk: 'Low',
+            trustScore: 80,
+            reasoning: 'Trusted source',
+            redFlags: []
+          })
+        }]
+      };
 
-    test('should classify low credibility as High risk', () => {
-      const score = 30;
-      const risk = agent.assessFakeRisk(score);
-      expect(risk).toBe('High');
-    });
+      agent.anthropic.messages.create.mockResolvedValue(mockResponse);
 
-    test('should handle edge case at 70', () => {
-      const risk70 = agent.assessFakeRisk(70);
-      const risk69 = agent.assessFakeRisk(69);
-      expect(risk70).toBe('Low');
-      expect(risk69).toBe('Medium');
-    });
-
-    test('should handle edge case at 50', () => {
-      const risk50 = agent.assessFakeRisk(50);
-      const risk49 = agent.assessFakeRisk(49);
-      expect(risk50).toBe('Medium');
-      expect(risk49).toBe('High');
-    });
-  });
-
-  describe('Task Execution', () => {
-    test('should process headline and return credibility assessment', async () => {
       const task = {
-        type: 'assess_credibility',
         headline: {
           id: 'test-123',
-          sourceName: 'Reuters',
-          sourceUrl: 'https://reuters.com',
-          title: 'Government announces policy',
-          description: 'Official announcement'
+          title: 'Breaking News',
+          description: 'Important announcement',
+          sourceName: 'Reuters'
         }
       };
 
       const result = await agent.execute(task);
 
-      expect(result).toHaveProperty('newsId', 'test-123');
-      expect(result).toHaveProperty('credibilityScore');
-      expect(result).toHaveProperty('trustScore');
-      expect(result).toHaveProperty('fakeRisk');
-      expect(result).toHaveProperty('redFlags');
-      expect(result.credibilityScore).toBeGreaterThanOrEqual(0);
-      expect(result.credibilityScore).toBeLessThanOrEqual(100);
+      expect(agent.anthropic.messages.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          model: 'claude-sonnet-4-5-20250929',
+          max_tokens: 1024
+        })
+      );
+
+      expect(result).toHaveProperty('credibilityScore', 75);
+      expect(result).toHaveProperty('fakeRisk', 'Low');
+      expect(result).toHaveProperty('trustScore', 80);
     });
 
-    test('should handle missing headline gracefully', async () => {
-      const task = {
-        type: 'assess_credibility'
+    test('should include headline data in result', async () => {
+      const mockResponse = {
+        content: [{
+          text: JSON.stringify({
+            credibilityScore: 65,
+            fakeRisk: 'Medium',
+            trustScore: 70,
+            reasoning: 'Some concerns',
+            redFlags: ['sensational language']
+          })
+        }]
       };
 
-      await expect(agent.execute(task)).rejects.toThrow('No headline provided');
+      agent.anthropic.messages.create.mockResolvedValue(mockResponse);
+
+      const headline = {
+        id: 'test-123',
+        title: 'Test Article',
+        description: 'Test description',
+        sourceName: 'Test Source'
+      };
+
+      const task = { headline };
+      const result = await agent.execute(task);
+
+      expect(result.id).toBe('test-123');
+      expect(result.title).toBe('Test Article');
+      expect(result.credibilityScore).toBe(65);
     });
 
-    test('should emit credibility:scored event', (done) => {
+    test('should set requiresApproval for low credibility', async () => {
+      const mockResponse = {
+        content: [{
+          text: JSON.stringify({
+            credibilityScore: 45, // Below threshold of 70
+            fakeRisk: 'Medium',
+            trustScore: 50,
+            reasoning: 'Low credibility',
+            redFlags: []
+          })
+        }]
+      };
+
+      agent.anthropic.messages.create.mockResolvedValue(mockResponse);
+
       const task = {
-        type: 'assess_credibility',
         headline: {
           id: 'test-123',
-          sourceName: 'Reuters',
+          title: 'Questionable News',
+          sourceName: 'Unknown'
+        }
+      };
+
+      const result = await agent.execute(task);
+
+      expect(result.requiresApproval).toBe(true);
+    });
+
+    test('should set requiresApproval for high fake risk', async () => {
+      const mockResponse = {
+        content: [{
+          text: JSON.stringify({
+            credibilityScore: 75, // Above threshold
+            fakeRisk: 'High', // But high risk
+            trustScore: 50,
+            reasoning: 'High fake news risk',
+            redFlags: ['multiple red flags']
+          })
+        }]
+      };
+
+      agent.anthropic.messages.create.mockResolvedValue(mockResponse);
+
+      const task = {
+        headline: {
+          id: 'test-123',
+          title: 'Suspicious Article'
+        }
+      };
+
+      const result = await agent.execute(task);
+
+      expect(result.requiresApproval).toBe(true);
+    });
+
+    test('should not require approval for high credibility', async () => {
+      const mockResponse = {
+        content: [{
+          text: JSON.stringify({
+            credibilityScore: 85, // Above threshold
+            fakeRisk: 'Low',
+            trustScore: 90,
+            reasoning: 'Trusted source',
+            redFlags: []
+          })
+        }]
+      };
+
+      agent.anthropic.messages.create.mockResolvedValue(mockResponse);
+
+      const task = {
+        headline: {
+          id: 'test-123',
+          title: 'Official Announcement',
+          sourceName: 'Reuters'
+        }
+      };
+
+      const result = await agent.execute(task);
+
+      expect(result.requiresApproval).toBe(false);
+    });
+
+    test('should handle API errors gracefully', async () => {
+      agent.anthropic.messages.create.mockRejectedValue(new Error('API Error'));
+
+      const task = {
+        headline: {
+          id: 'test-123',
           title: 'Test'
         }
       };
 
-      agent.on('credibility:scored', (data) => {
-        expect(data).toHaveProperty('newsId');
-        expect(data).toHaveProperty('credibilityScore');
-        done();
-      });
-
-      agent.execute(task);
+      await expect(agent.execute(task)).rejects.toThrow('API Error');
     });
   });
 
-  describe('Approval Decision', () => {
-    test('should mark high credibility for auto-publish', async () => {
-      const task = {
-        type: 'assess_credibility',
-        headline: {
-          id: 'test-123',
-          sourceName: 'Reuters',
-          sourceUrl: 'https://reuters.com',
-          title: 'Official government announcement',
-          author: 'Staff Reporter'
-        }
+  describe('Credibility Threshold', () => {
+    test('should use environment variable for threshold', async () => {
+      process.env.CREDIBILITY_THRESHOLD = '80';
+
+      await agent.initialize();
+
+      const mockResponse = {
+        content: [{
+          text: JSON.stringify({
+            credibilityScore: 75, // Between 70 and 80
+            fakeRisk: 'Low',
+            trustScore: 75,
+            reasoning: 'Good',
+            redFlags: []
+          })
+        }]
       };
 
+      agent.anthropic.messages.create.mockResolvedValue(mockResponse);
+
+      const task = { headline: { id: '123', title: 'Test' } };
       const result = await agent.execute(task);
 
-      if (result.credibilityScore >= 70) {
-        expect(result.requiresApproval).toBe(false);
-      }
+      // Should require approval because 75 < 80
+      expect(result.requiresApproval).toBe(true);
     });
 
-    test('should mark low credibility for approval', async () => {
-      const task = {
-        type: 'assess_credibility',
-        headline: {
-          id: 'test-123',
-          sourceName: 'Unknown',
-          title: 'BREAKING: You won\'t believe this!!!',
-          description: 'Shocking secret revealed'
-        }
+    test('should use default threshold of 70 if not set', async () => {
+      delete process.env.CREDIBILITY_THRESHOLD;
+
+      await agent.initialize();
+
+      const mockResponse = {
+        content: [{
+          text: JSON.stringify({
+            credibilityScore: 75,
+            fakeRisk: 'Low',
+            trustScore: 75,
+            reasoning: 'Good',
+            redFlags: []
+          })
+        }]
       };
 
+      agent.anthropic.messages.create.mockResolvedValue(mockResponse);
+
+      const task = { headline: { id: '123', title: 'Test' } };
       const result = await agent.execute(task);
 
-      if (result.credibilityScore < 50) {
-        expect(result.requiresApproval).toBe(true);
-      }
+      // Should not require approval because 75 >= 70 (default)
+      expect(result.requiresApproval).toBe(false);
     });
   });
 });

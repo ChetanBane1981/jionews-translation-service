@@ -1,361 +1,378 @@
 import { DetectionAgent } from '../detection-agent.js';
 
+// Mock logger
+jest.mock('../../utils/logger.js', () => ({
+  logger: {
+    info: jest.fn(),
+    error: jest.fn(),
+    warn: jest.fn()
+  }
+}));
+
+// Mock Anthropic SDK
+jest.mock('@anthropic-ai/sdk', () => {
+  return jest.fn().mockImplementation(() => ({
+    messages: {
+      create: jest.fn()
+    }
+  }));
+});
+
 describe('DetectionAgent', () => {
   let agent;
-  let mockConfig;
 
   beforeEach(() => {
-    mockConfig = {
-      anthropicApiKey: 'test-key',
-      breakingThreshold: 70
-    };
-    agent = new DetectionAgent(mockConfig);
+    agent = new DetectionAgent();
+    process.env.ANTHROPIC_API_KEY = 'test-key';
   });
 
   afterEach(() => {
-    if (agent) {
+    if (agent && agent.status !== 'shutdown') {
       agent.shutdown();
     }
+    delete process.env.ANTHROPIC_API_KEY;
   });
 
   describe('Initialization', () => {
     test('should create agent with correct name', () => {
-      expect(agent.name).toBe('detection');
+      expect(agent.name).toBe('DetectionAgent');
     });
 
-    test('should initialize breaking keywords list', () => {
-      expect(agent.breakingKeywords).toBeInstanceOf(Array);
-      expect(agent.breakingKeywords.length).toBeGreaterThan(0);
+    test('should have autoRetry enabled', () => {
+      expect(agent.config.autoRetry).toBe(true);
     });
 
-    test('should set breaking threshold from config', () => {
-      expect(agent.breakingThreshold).toBe(70);
-    });
-  });
-
-  describe('Breaking News Keyword Detection', () => {
-    test('should detect "breaking" keyword', () => {
-      const headline = { title: 'Breaking: Major incident reported' };
-      const hasKeywords = agent.hasBreakingKeywords(headline);
-      expect(hasKeywords).toBe(true);
+    test('should have correct model configured', () => {
+      expect(agent.config.model).toBe('claude-sonnet-4-5-20250929');
     });
 
-    test('should detect "urgent" keyword', () => {
-      const headline = { title: 'Urgent: Immediate action required' };
-      const hasKeywords = agent.hasBreakingKeywords(headline);
-      expect(hasKeywords).toBe(true);
-    });
-
-    test('should detect keywords in description', () => {
-      const headline = {
-        title: 'Latest updates',
-        description: 'Breaking news from the capital'
-      };
-      const hasKeywords = agent.hasBreakingKeywords(headline);
-      expect(hasKeywords).toBe(true);
-    });
-
-    test('should be case insensitive', () => {
-      const headline = { title: 'BREAKING NEWS UPDATE' };
-      const hasKeywords = agent.hasBreakingKeywords(headline);
-      expect(hasKeywords).toBe(true);
-    });
-
-    test('should not detect breaking in normal news', () => {
-      const headline = {
-        title: 'Regular news article',
-        description: 'Standard reporting on daily events'
-      };
-      const hasKeywords = agent.hasBreakingKeywords(headline);
-      expect(hasKeywords).toBe(false);
-    });
-
-    test('should handle missing title and description', () => {
-      const headline = {};
-      const hasKeywords = agent.hasBreakingKeywords(headline);
-      expect(hasKeywords).toBe(false);
+    test('should initialize anthropic client on initialize', async () => {
+      await agent.initialize();
+      expect(agent.anthropic).toBeTruthy();
+      expect(agent.status).toBe('ready');
     });
   });
 
-  describe('Recency Scoring', () => {
-    test('should give high score to recent news (within 1 hour)', () => {
-      const now = new Date();
-      const headline = { publishedAt: new Date(now - 30 * 60 * 1000) }; // 30 min ago
-      const score = agent.calculateRecencyScore(headline);
-      expect(score).toBeGreaterThanOrEqual(90);
+  describe('Helper Methods', () => {
+    describe('extractScore', () => {
+      test('should extract score from text with slash format', () => {
+        const text = 'The importance score is 85/100';
+        const score = agent.extractScore(text);
+        expect(score).toBe(85);
+      });
+
+      test('should extract score with "score:" prefix', () => {
+        const text = 'Overall assessment: score: 72';
+        const score = agent.extractScore(text);
+        expect(score).toBe(72);
+      });
+
+      test('should return default 50 if no score found', () => {
+        const text = 'No score in this text';
+        const score = agent.extractScore(text);
+        expect(score).toBe(50);
+      });
     });
 
-    test('should give medium score to news within 6 hours', () => {
-      const now = new Date();
-      const headline = { publishedAt: new Date(now - 3 * 60 * 60 * 1000) }; // 3 hours ago
-      const score = agent.calculateRecencyScore(headline);
-      expect(score).toBeGreaterThanOrEqual(50);
-      expect(score).toBeLessThan(90);
+    describe('extractUrgency', () => {
+      test('should detect Critical urgency', () => {
+        const text = 'This is CRITICAL news';
+        const urgency = agent.extractUrgency(text);
+        expect(urgency).toBe('Critical');
+      });
+
+      test('should detect High urgency', () => {
+        const text = 'High importance alert';
+        const urgency = agent.extractUrgency(text);
+        expect(urgency).toBe('High');
+      });
+
+      test('should detect Low urgency', () => {
+        const text = 'Low priority update';
+        const urgency = agent.extractUrgency(text);
+        expect(urgency).toBe('Low');
+      });
+
+      test('should default to Medium urgency', () => {
+        const text = 'Regular news update';
+        const urgency = agent.extractUrgency(text);
+        expect(urgency).toBe('Medium');
+      });
+
+      test('should be case insensitive', () => {
+        expect(agent.extractUrgency('critical alert')).toBe('Critical');
+        expect(agent.extractUrgency('HIGH priority')).toBe('High');
+        expect(agent.extractUrgency('low impact')).toBe('Low');
+      });
     });
 
-    test('should give low score to old news (>24 hours)', () => {
-      const now = new Date();
-      const headline = { publishedAt: new Date(now - 48 * 60 * 60 * 1000) }; // 2 days ago
-      const score = agent.calculateRecencyScore(headline);
-      expect(score).toBeLessThan(50);
-    });
+    describe('extractCategory', () => {
+      test('should detect Politics category', () => {
+        const text = 'Government announces new politics initiative';
+        const category = agent.extractCategory(text);
+        expect(category).toBe('Politics');
+      });
 
-    test('should give minimum score to very old news', () => {
-      const now = new Date();
-      const headline = { publishedAt: new Date(now - 7 * 24 * 60 * 60 * 1000) }; // 7 days ago
-      const score = agent.calculateRecencyScore(headline);
-      expect(score).toBe(10);
-    });
+      test('should detect Business category', () => {
+        const text = 'Stock market business news';
+        const category = agent.extractCategory(text);
+        expect(category).toBe('Business');
+      });
 
-    test('should handle missing publishedAt with fetchedAt', () => {
-      const headline = { fetchedAt: new Date() };
-      const score = agent.calculateRecencyScore(headline);
-      expect(score).toBeGreaterThan(0);
-    });
+      test('should detect Technology category', () => {
+        const text = 'New technology breakthrough';
+        const category = agent.extractCategory(text);
+        expect(category).toBe('Technology');
+      });
 
-    test('should handle missing both dates', () => {
-      const headline = {};
-      const score = agent.calculateRecencyScore(headline);
-      expect(score).toBe(50);
-    });
-  });
+      test('should detect Sports category', () => {
+        const text = 'Major sports championship';
+        const category = agent.extractCategory(text);
+        expect(category).toBe('Sports');
+      });
 
-  describe('Category Detection', () => {
-    test('should detect Politics category', () => {
-      const headline = {
-        title: 'Government announces new policy',
-        description: 'Prime Minister speaks about election'
-      };
-      const category = agent.detectCategory(headline);
-      expect(category).toBe('Politics');
-    });
+      test('should detect Entertainment category', () => {
+        const text = 'Entertainment industry news';
+        const category = agent.extractCategory(text);
+        expect(category).toBe('Entertainment');
+      });
 
-    test('should detect Business category', () => {
-      const headline = {
-        title: 'Stock market reaches new high',
-        description: 'Economy shows strong growth'
-      };
-      const category = agent.detectCategory(headline);
-      expect(category).toBe('Business');
-    });
+      test('should detect Health category', () => {
+        const text = 'New health guidelines released';
+        const category = agent.extractCategory(text);
+        expect(category).toBe('Health');
+      });
 
-    test('should detect Technology category', () => {
-      const headline = {
-        title: 'New AI breakthrough announced',
-        description: 'Software update improves performance'
-      };
-      const category = agent.detectCategory(headline);
-      expect(category).toBe('Technology');
-    });
+      test('should default to Other for unknown categories', () => {
+        const text = 'Random miscellaneous news';
+        const category = agent.extractCategory(text);
+        expect(category).toBe('Other');
+      });
 
-    test('should detect Sports category', () => {
-      const headline = {
-        title: 'Cricket team wins match',
-        description: 'Football tournament begins next week'
-      };
-      const category = agent.detectCategory(headline);
-      expect(category).toBe('Sports');
-    });
-
-    test('should detect Entertainment category', () => {
-      const headline = {
-        title: 'New movie breaks box office records',
-        description: 'Celebrity announces new album'
-      };
-      const category = agent.detectCategory(headline);
-      expect(category).toBe('Entertainment');
-    });
-
-    test('should detect Health category', () => {
-      const headline = {
-        title: 'New medical treatment approved',
-        description: 'Hospital announces vaccination drive'
-      };
-      const category = agent.detectCategory(headline);
-      expect(category).toBe('Health');
-    });
-
-    test('should default to Other for unclassified content', () => {
-      const headline = {
-        title: 'Random news article',
-        description: 'Some content about something'
-      };
-      const category = agent.detectCategory(headline);
-      expect(category).toBe('Other');
+      test('should be case insensitive', () => {
+        expect(agent.extractCategory('POLITICS')).toBe('Politics');
+        expect(agent.extractCategory('technology')).toBe('Technology');
+      });
     });
   });
 
-  describe('Urgency Assessment', () => {
-    test('should assess Critical urgency for breaking + recent', () => {
-      const headline = {
-        title: 'Breaking: Emergency declared',
-        publishedAt: new Date()
-      };
-      const importance = 90;
-      const urgency = agent.assessUrgency(headline, importance);
-      expect(urgency).toBe('Critical');
+  describe('Parse Analysis', () => {
+    test('should parse valid JSON response', () => {
+      const response = JSON.stringify({
+        'Breaking News': 'Yes',
+        'Importance Score': 85,
+        'Urgency Level': 'High',
+        'Category': 'Politics',
+        'Reasoning': 'Major political development'
+      });
+
+      const result = agent.parseAnalysis(response);
+
+      expect(result.breaking).toBe(true);
+      expect(result.importanceScore).toBe(85);
+      expect(result.urgency).toBe('High');
+      expect(result.category).toBe('Politics');
+      expect(result.reasoning).toBe('Major political development');
     });
 
-    test('should assess High urgency for important recent news', () => {
-      const headline = {
-        title: 'Major incident reported',
-        publishedAt: new Date(Date.now() - 30 * 60 * 1000)
-      };
-      const importance = 75;
-      const urgency = agent.assessUrgency(headline, importance);
-      expect(urgency).toBe('High');
+    test('should parse camelCase JSON format', () => {
+      const response = JSON.stringify({
+        breaking: true,
+        importanceScore: 75,
+        urgency: 'Medium',
+        category: 'Business',
+        reasoning: 'Economic impact'
+      });
+
+      const result = agent.parseAnalysis(response);
+
+      expect(result.breaking).toBe(true);
+      expect(result.importanceScore).toBe(75);
+      expect(result.urgency).toBe('Medium');
+      expect(result.category).toBe('Business');
     });
 
-    test('should assess Medium urgency for moderate importance', () => {
-      const headline = {
-        title: 'Regular news update',
-        publishedAt: new Date(Date.now() - 2 * 60 * 60 * 1000)
-      };
-      const importance = 55;
-      const urgency = agent.assessUrgency(headline, importance);
-      expect(urgency).toBe('Medium');
+    test('should extract JSON from text with surrounding content', () => {
+      const text = `Analysis complete. Here are the results:
+
+      {"breaking": true, "importanceScore": 90, "urgency": "Critical", "category": "Politics", "reasoning": "Emergency situation"}
+
+      End of analysis.`;
+
+      const result = agent.parseAnalysis(text);
+
+      expect(result.breaking).toBe(true);
+      expect(result.importanceScore).toBe(90);
+      expect(result.urgency).toBe('Critical');
     });
 
-    test('should assess Low urgency for old or unimportant news', () => {
-      const headline = {
-        title: 'Regular article',
-        publishedAt: new Date(Date.now() - 12 * 60 * 60 * 1000)
-      };
-      const importance = 40;
-      const urgency = agent.assessUrgency(headline, importance);
-      expect(urgency).toBe('Low');
-    });
-  });
+    test('should handle "No" for breaking news', () => {
+      const response = JSON.stringify({
+        'Breaking News': 'No',
+        'Importance Score': 40
+      });
 
-  describe('Importance Calculation', () => {
-    test('should give high importance to breaking + recent + politics', () => {
-      const headline = {
-        title: 'Breaking: Government announces emergency',
-        description: 'Prime Minister addresses nation',
-        publishedAt: new Date()
-      };
-      const importance = agent.calculateImportance(headline, 'Politics');
-      expect(importance).toBeGreaterThanOrEqual(70);
+      const result = agent.parseAnalysis(response);
+
+      expect(result.breaking).toBe(false);
     });
 
-    test('should give bonus to Politics and Business categories', () => {
-      const politicsHeadline = {
-        title: 'Political news',
-        publishedAt: new Date()
-      };
-      const sportsHeadline = {
-        title: 'Sports news',
-        publishedAt: new Date()
-      };
-      const politicsScore = agent.calculateImportance(politicsHeadline, 'Politics');
-      const sportsScore = agent.calculateImportance(sportsHeadline, 'Sports');
-      expect(politicsScore).toBeGreaterThan(sportsScore);
+    test('should use fallback parsing for non-JSON text', () => {
+      const text = 'Breaking News: Yes, Importance: 80/100, High urgency, Politics category';
+
+      const result = agent.parseAnalysis(text);
+
+      expect(result.breaking).toBe(true); // Contains 'yes'
+      expect(result.importanceScore).toBe(80);
+      expect(result.urgency).toBe('High');
+      expect(result.category).toBe('Politics');
     });
 
-    test('should give bonus for breaking keywords', () => {
-      const breakingHeadline = {
-        title: 'Breaking news alert',
-        publishedAt: new Date()
-      };
-      const regularHeadline = {
-        title: 'Regular news',
-        publishedAt: new Date()
-      };
-      const breakingScore = agent.calculateImportance(breakingHeadline, 'Other');
-      const regularScore = agent.calculateImportance(regularHeadline, 'Other');
-      expect(breakingScore).toBeGreaterThan(regularScore);
+    test('should return defaults on parse error', () => {
+      const invalidText = ''; // Empty string
+
+      const result = agent.parseAnalysis(invalidText);
+
+      expect(result.breaking).toBe(false);
+      expect(result.importanceScore).toBe(50);
+      expect(result.urgency).toBe('Medium');
+      expect(result.category).toBe('Other');
+      expect(result.reasoning).toBeDefined(); // Empty string is defined
     });
-  });
 
-  describe('Task Execution', () => {
-    test('should process headline and return detection results', async () => {
-      const task = {
-        type: 'detect_breaking',
-        headline: {
-          id: 'test-123',
-          title: 'Breaking: Major announcement',
-          description: 'Government makes urgent statement',
-          publishedAt: new Date()
-        }
-      };
+    test('should handle malformed JSON gracefully', () => {
+      const malformedJson = '{"breaking": true, "importanceScore": 80'; // Missing closing brace
 
-      const result = await agent.execute(task);
+      const result = agent.parseAnalysis(malformedJson);
 
-      expect(result).toHaveProperty('newsId', 'test-123');
+      // Should use fallback parsing
       expect(result).toHaveProperty('breaking');
       expect(result).toHaveProperty('importanceScore');
       expect(result).toHaveProperty('urgency');
       expect(result).toHaveProperty('category');
-      expect(result.breaking).toBe(true);
-      expect(result.importanceScore).toBeGreaterThanOrEqual(0);
-      expect(result.importanceScore).toBeLessThanOrEqual(100);
+    });
+  });
+
+  describe('Execute Method', () => {
+    beforeEach(async () => {
+      await agent.initialize();
     });
 
-    test('should classify non-breaking news correctly', async () => {
+    test('should process headline and call Claude API', async () => {
+      const mockResponse = {
+        content: [{
+          text: JSON.stringify({
+            'Breaking News': 'Yes',
+            'Importance Score': 85,
+            'Urgency Level': 'High',
+            'Category': 'Politics',
+            'Reasoning': 'Major announcement'
+          })
+        }]
+      };
+
+      agent.anthropic.messages.create.mockResolvedValue(mockResponse);
+
       const task = {
-        type: 'detect_breaking',
         headline: {
-          id: 'test-456',
-          title: 'Regular sports update',
-          description: 'Match scheduled for next week',
-          publishedAt: new Date(Date.now() - 48 * 60 * 60 * 1000)
+          id: 'test-123',
+          title: 'Breaking: Major Political Event',
+          description: 'Government announces changes',
+          sourceName: 'Reuters',
+          publishedAt: new Date()
         }
       };
 
       const result = await agent.execute(task);
 
-      expect(result.breaking).toBe(false);
-      expect(result.importanceScore).toBeLessThan(70);
+      expect(agent.anthropic.messages.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          model: 'claude-sonnet-4-5-20250929',
+          max_tokens: 1024
+        })
+      );
+
+      expect(result.breaking).toBe(true);
+      expect(result.importanceScore).toBe(85);
+      expect(result.urgency).toBe('High');
+      expect(result.category).toBe('Politics');
     });
 
-    test('should handle missing headline gracefully', async () => {
-      const task = {
-        type: 'detect_breaking'
+    test('should include headline data in result', async () => {
+      const mockResponse = {
+        content: [{
+          text: JSON.stringify({
+            breaking: false,
+            importanceScore: 60,
+            urgency: 'Medium',
+            category: 'Sports',
+            reasoning: 'Regular sports news'
+          })
+        }]
       };
 
-      await expect(agent.execute(task)).rejects.toThrow('No headline provided');
+      agent.anthropic.messages.create.mockResolvedValue(mockResponse);
+
+      const headline = {
+        id: 'test-456',
+        title: 'Sports Update',
+        description: 'Team wins match',
+        sourceName: 'ESPN'
+      };
+
+      const task = { headline };
+      const result = await agent.execute(task);
+
+      expect(result.id).toBe('test-456');
+      expect(result.title).toBe('Sports Update');
+      expect(result.breaking).toBe(false);
+      expect(result.category).toBe('Sports');
     });
 
-    test('should emit breaking:detected event for breaking news', (done) => {
+    test('should handle API errors', async () => {
+      agent.anthropic.messages.create.mockRejectedValue(new Error('API Error'));
+
       const task = {
-        type: 'detect_breaking',
         headline: {
           id: 'test-123',
-          title: 'Breaking: Emergency declared',
-          publishedAt: new Date()
+          title: 'Test'
         }
       };
 
-      agent.on('breaking:detected', (data) => {
-        expect(data).toHaveProperty('newsId');
-        expect(data.breaking).toBe(true);
-        done();
-      });
+      await expect(agent.execute(task)).rejects.toThrow('API Error');
+    });
 
-      agent.execute(task);
+    test('should add detectionReasoning to result', async () => {
+      const mockResponse = {
+        content: [{
+          text: JSON.stringify({
+            breaking: true,
+            importanceScore: 90,
+            urgency: 'Critical',
+            category: 'Health',
+            reasoning: 'Public health emergency'
+          })
+        }]
+      };
+
+      agent.anthropic.messages.create.mockResolvedValue(mockResponse);
+
+      const task = {
+        headline: {
+          id: 'test-123',
+          title: 'Health Alert'
+        }
+      };
+
+      const result = await agent.execute(task);
+
+      expect(result.detectionReasoning).toBe('Public health emergency');
     });
   });
 
-  describe('Edge Cases', () => {
-    test('should handle very long titles', () => {
-      const longTitle = 'A'.repeat(500);
-      const headline = { title: longTitle };
-      const category = agent.detectCategory(headline);
-      expect(category).toBeTruthy();
-    });
-
-    test('should handle special characters in title', () => {
-      const headline = { title: '🔥 Breaking: Major event! 🚨' };
-      const hasKeywords = agent.hasBreakingKeywords(headline);
-      expect(hasKeywords).toBe(true);
-    });
-
-    test('should handle future dates', () => {
-      const futureDate = new Date(Date.now() + 24 * 60 * 60 * 1000);
-      const headline = { publishedAt: futureDate };
-      const score = agent.calculateRecencyScore(headline);
-      expect(score).toBeGreaterThanOrEqual(0);
-      expect(score).toBeLessThanOrEqual(100);
+  describe('Make Decision', () => {
+    test('should have makeDecision method', () => {
+      expect(typeof agent.makeDecision).toBe('function');
     });
   });
 });
