@@ -55,7 +55,6 @@ export interface NewsItem {
 
   // Publishing
   published?: boolean;
-  publishedAt?: Date;
   autoPublished?: boolean;
 
   // Human Approval

@@ -20,7 +20,7 @@ export default function SystemMetrics() {
         getSystemMetrics(),
         getHealth()
       ])
-      setMetrics(metricsData.data)
+      setMetrics(metricsData.data ?? null)
       setHealth(healthData)
     } catch (error) {
       console.error('Failed to load metrics:', error)

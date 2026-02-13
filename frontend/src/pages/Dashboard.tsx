@@ -20,7 +20,7 @@ export default function Dashboard() {
         getSystemMetrics(),
         getHealth()
       ])
-      setMetrics(metricsData.data)
+      setMetrics(metricsData.data ?? null)
       setHealth(healthData)
     } catch (error) {
       console.error('Failed to load dashboard data:', error)
