@@ -1,0 +1,37 @@
+version: '3.8'
+
+services:
+  mongodb:
+    image: mongo:7.0
+    container_name: jionews-mongodb
+    ports:
+      - "27017:27017"
+    environment:
+      MONGO_INITDB_DATABASE: jionews-sentinel
+    volumes:
+      - mongodb_data:/data/db
+    restart: unless-stopped
+    networks:
+      - jionews-network
+
+  redis:
+    image: redis:7-alpine
+    container_name: jionews-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    restart: unless-stopped
+    networks:
+      - jionews-network
+    command: redis-server --appendonly yes
+
+volumes:
+  mongodb_data:
+    driver: local
+  redis_data:
+    driver: local
+
+networks:
+  jionews-network:
+    driver: bridge

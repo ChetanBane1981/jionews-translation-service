@@ -6,6 +6,8 @@ import { CredibilityAgent } from '../agents/credibility-agent.js';
 import { ClusterAgent } from '../agents/cluster-agent.js';
 import { ModerationAgent } from '../agents/moderation-agent.js';
 import { SummaryAgent } from '../agents/summary-agent.js';
+import { TranslationAgent } from '../agents/translation-agent.js';
+import { RankingAgent } from '../agents/ranking-agent.js';
 import { PersonalizationAgent } from '../agents/personalization-agent.js';
 import { PublishingAgent } from '../agents/publishing-agent.js';
 
@@ -35,6 +37,8 @@ export class Orchestrator extends EventEmitter {
     this.registerAgent('moderation', new ModerationAgent());
     this.registerAgent('credibility', new CredibilityAgent());
     this.registerAgent('summary', new SummaryAgent());
+    this.registerAgent('translation', new TranslationAgent());
+    this.registerAgent('ranking', new RankingAgent());
     this.registerAgent('personalization', new PersonalizationAgent());
     this.registerAgent('publishing', new PublishingAgent());
 
@@ -93,9 +97,11 @@ export class Orchestrator extends EventEmitter {
       'cluster',        // 3. Deduplicate & cluster
       'moderation',     // 4. Apply filtration rules
       'credibility',    // 5. Score credibility & fake risk
-      'summary',        // 6. Generate summaries & translate
-      'personalization',// 7. Personalize for user segments
-      'publishing'      // 8. Auto-publish or request approval
+      'summary',        // 6. Generate summaries
+      'translation',    // 7. Translate to multiple languages
+      'ranking',        // 8. Rank and detect trending
+      'personalization',// 9. Personalize for user segments
+      'publishing'      // 10. Auto-publish or request approval
     ];
     logger.info('[Orchestrator] Pipeline defined:', this.pipeline);
   }

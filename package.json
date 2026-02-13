@@ -7,11 +7,17 @@
   "scripts": {
     "start": "node src/orchestrator/index.js",
     "dev": "nodemon src/orchestrator/index.js",
+    "api": "node src/api/server.js",
+    "api:dev": "nodemon src/api/server.js",
     "test": "jest",
+    "test:watch": "jest --watch",
     "agent:feed": "node src/agents/feed-agent.js",
     "agent:detection": "node src/agents/detection-agent.js",
     "agent:credibility": "node src/agents/credibility-agent.js",
-    "monitor": "node src/monitoring/monitor.js"
+    "monitor": "node src/monitoring/monitor.js",
+    "db:seed": "node scripts/seed-database.js",
+    "docker:up": "docker-compose up -d",
+    "docker:down": "docker-compose down"
   },
   "keywords": ["ai", "newsroom", "autonomous", "agents", "llm"],
   "author": "JioNews Team",
