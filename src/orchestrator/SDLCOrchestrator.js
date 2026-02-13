@@ -7,20 +7,27 @@ import TestingAgent from '../agents/sdlc/TestingAgent.js';
 import HumanGateAgent from '../agents/sdlc/HumanGateAgent.js';
 import UserStory from '../models/UserStory.js';
 import Task from '../models/Task.js';
+import TestCase from '../models/TestCase.js';
 import ApprovalGate from '../models/ApprovalGate.js';
 
 /**
  * SDLCOrchestrator - Coordinates the complete software development lifecycle
  *
- * Workflow:
- * 1. PM gathers requirements → creates story
- * 2. Human reviews story → PM approval gate
- * 3. Master agent decomposes → creates tasks + test cases
- * 4. Developer agents implement tasks
- * 5. Testing agent validates results
- * 6. Iteration if tests fail
- * 7. Final walkthrough (human gate)
- * 8. Production approval (human gate)
+ * ENHANCED WORKFLOW WITH TEAM TRANSITIONS:
+ * 1. PM provides requirements → creates story
+ * 2. Research Team researches → updates acceptance criteria
+ * 3. [CHECKPOINT 1] Human approval → move to Development
+ * 4. Dev Lead (Master) creates constitution, use cases, decomposes tasks
+ * 5. Testing Lead creates test cases (ready state, waits for dev)
+ * 6. Dev Sub-Agents work in PARALLEL on tasks (iteration or completion)
+ * 7. [CHECKPOINT 2] Use cases validation → if pass, move to Testing
+ * 8. Testing Agent runs all test cases
+ *    - If FAIL → revert to Dev (iteration loop)
+ *    - If PASS → generate test matrix
+ * 9. [CHECKPOINT 3] PM reviews test matrix → final approval
+ * 10. [CHECKPOINT 4] Production approval → DONE
+ *
+ * Human Interference: Only at checkpoints for approval to move between teams
  */
 
 export class SDLCOrchestrator extends EventEmitter {
@@ -509,6 +516,342 @@ export class SDLCOrchestrator extends EventEmitter {
       grouped[task.status] = (grouped[task.status] || 0) + 1;
     });
     return grouped;
+  }
+
+  /**
+   * ENHANCEMENT: Execute tasks in parallel (Dev sub-agents)
+   */
+  async executeTasksInParallel(storyId) {
+    try {
+      const tasks = await Task.find({ storyId, status: 'assigned' });
+
+      if (tasks.length === 0) {
+        this.logger.warn('No tasks to execute in parallel');
+        return { success: true, message: 'No tasks ready' };
+      }
+
+      this.logger.info(`Executing ${tasks.length} tasks in parallel`);
+
+      // Execute all tasks concurrently
+      const promises = tasks.map(task => {
+        const agent = this.developerAgents.find(a => a.name === task.assignedTo.agent);
+        if (!agent) {
+          this.logger.warn(`Agent ${task.assignedTo.agent} not found, using default`);
+          return this.executeDeveloperTask(task.taskId, this.developerAgents[0].name);
+        }
+        return this.executeDeveloperTask(task.taskId, task.assignedTo.agent);
+      });
+
+      // Wait for all to complete
+      const results = await Promise.allSettled(promises);
+
+      const summary = {
+        total: results.length,
+        successful: results.filter(r => r.status === 'fulfilled').length,
+        failed: results.filter(r => r.status === 'rejected').length
+      };
+
+      this.emit('tasks:parallel-execution-complete', {
+        storyId,
+        summary
+      });
+
+      return {
+        success: true,
+        summary,
+        results
+      };
+
+    } catch (error) {
+      this.logger.error('Parallel execution failed', { error: error.message });
+      throw error;
+    }
+  }
+
+  /**
+   * ENHANCEMENT: Validate use cases before moving to testing
+   */
+  async validateUseCases(storyId) {
+    try {
+      const story = await UserStory.findOne({ storyId });
+      if (!story) throw new Error(`Story ${storyId} not found`);
+
+      // Get all tasks
+      const tasks = await Task.findByStory(story._id);
+      const allComplete = tasks.every(t => t.status === 'completed');
+
+      if (!allComplete) {
+        return {
+          success: false,
+          message: 'Not all tasks complete',
+          ready: false
+        };
+      }
+
+      // Create use cases validation checkpoint (CHECKPOINT 2)
+      await this.humanGateAgent.execute({
+        mode: 'create-gate',
+        data: {
+          entityType: 'user-story',
+          entityId: storyId,
+          gateType: 'technical-review',
+          approvers: [
+            {
+              role: 'tech-lead',
+              userId: 'tech-001',
+              name: 'Technical Lead',
+              required: true
+            }
+          ],
+          checklist: [
+            'All use cases implemented correctly',
+            'Code follows constitution rules',
+            'No critical bugs in implementation',
+            'Ready to move to testing phase'
+          ]
+        }
+      });
+
+      this.emit('use-cases:validation-required', {
+        storyId: story.storyId,
+        title: story.title,
+        taskCount: tasks.length
+      });
+
+      return {
+        success: true,
+        message: 'Use cases validation checkpoint created',
+        ready: false, // Waits for human approval
+        gateType: 'technical-review'
+      };
+
+    } catch (error) {
+      this.logger.error('Use cases validation failed', { error: error.message });
+      throw error;
+    }
+  }
+
+  /**
+   * ENHANCEMENT: Generate comprehensive test matrix for PM
+   */
+  async generateTestMatrix(storyId) {
+    try {
+      const story = await UserStory.findOne({ storyId });
+      if (!story) throw new Error(`Story ${storyId} not found`);
+
+      const testCases = await TestCase.findByStory(story._id);
+
+      if (testCases.length === 0) {
+        return {
+          success: false,
+          message: 'No test cases found'
+        };
+      }
+
+      // Calculate comprehensive test matrix
+      const matrix = {
+        storyId: story.storyId,
+        storyTitle: story.title,
+        testSummary: {
+          total: testCases.length,
+          passed: testCases.filter(tc => tc.status === 'passed').length,
+          failed: testCases.filter(tc => tc.status === 'failed').length,
+          skipped: testCases.filter(tc => tc.status === 'skipped').length,
+          passRate: 0
+        },
+        byType: {},
+        detailedResults: [],
+        overallDecision: 'pending'
+      };
+
+      // Calculate pass rate
+      matrix.testSummary.passRate = matrix.testSummary.total > 0
+        ? Math.round((matrix.testSummary.passed / matrix.testSummary.total) * 100)
+        : 0;
+
+      // Group by type
+      testCases.forEach(tc => {
+        if (!matrix.byType[tc.type]) {
+          matrix.byType[tc.type] = {
+            total: 0,
+            passed: 0,
+            failed: 0
+          };
+        }
+        matrix.byType[tc.type].total++;
+        if (tc.status === 'passed') matrix.byType[tc.type].passed++;
+        if (tc.status === 'failed') matrix.byType[tc.type].failed++;
+      });
+
+      // Detailed results
+      matrix.detailedResults = testCases.map(tc => ({
+        testCaseId: tc.testCaseId,
+        title: tc.title,
+        type: tc.type,
+        status: tc.status,
+        executions: tc.executions.length,
+        lastExecution: tc.lastExecuted,
+        passRate: tc.passMatrix.passRate,
+        consecutivePasses: tc.passMatrix.consecutivePasses,
+        stability: tc.passMatrix.stability
+      }));
+
+      // Overall decision
+      if (matrix.testSummary.passRate >= 95) {
+        matrix.overallDecision = 'approved';
+      } else if (matrix.testSummary.passRate >= 80) {
+        matrix.overallDecision = 'conditional-approval';
+        matrix.conditions = ['Some tests failed - review recommended'];
+      } else {
+        matrix.overallDecision = 'rejected';
+        matrix.reason = `Pass rate ${matrix.testSummary.passRate}% below threshold (80%)`;
+      }
+
+      this.logger.info('Test matrix generated', {
+        storyId,
+        passRate: matrix.testSummary.passRate,
+        decision: matrix.overallDecision
+      });
+
+      return {
+        success: true,
+        testMatrix: matrix
+      };
+
+    } catch (error) {
+      this.logger.error('Test matrix generation failed', { error: error.message });
+      throw error;
+    }
+  }
+
+  /**
+   * ENHANCEMENT: Revert ticket from Testing back to Dev (clear feedback loop)
+   */
+  async revertToDevFromTesting(storyId, failedTests) {
+    try {
+      const story = await UserStory.findOne({ storyId });
+      if (!story) throw new Error(`Story ${storyId} not found`);
+
+      // Update story status
+      story.status = 'in-progress';
+      story.addIteration(['Tests failed - reverting to development'], 'Testing phase failed');
+      await story.save();
+
+      // Get all tasks and reset to revision status
+      const tasks = await Task.findByStory(story._id);
+
+      const feedbackByTask = this.categorizeFailuresByTask(failedTests, tasks);
+
+      // Update tasks with specific feedback
+      for (const task of tasks) {
+        const feedback = feedbackByTask.get(task.taskId) || [];
+
+        if (feedback.length > 0) {
+          task.status = 'revision';
+          task.addIteration(['Test failures detected'], `Failed tests: ${feedback.join(', ')}`);
+          await task.save();
+
+          // Emit event for developer to handle
+          this.emit('task:revert-from-testing', {
+            taskId: task.taskId,
+            failures: feedback,
+            assignedTo: task.assignedTo.agent
+          });
+        }
+      }
+
+      this.logger.info('Ticket reverted to Development', {
+        storyId,
+        affectedTasks: Array.from(feedbackByTask.keys()).length
+      });
+
+      this.emit('story:reverted-to-dev', {
+        storyId: story.storyId,
+        title: story.title,
+        failureCount: failedTests.length,
+        iterationNumber: story.iterations.length
+      });
+
+      return {
+        success: true,
+        message: 'Ticket reverted to Development',
+        affectedTasks: Array.from(feedbackByTask.keys()).length,
+        iterationNumber: story.iterations.length
+      };
+
+    } catch (error) {
+      this.logger.error('Revert to dev failed', { error: error.message });
+      throw error;
+    }
+  }
+
+  /**
+   * ENHANCEMENT: Categorize test failures by task
+   */
+  categorizeFailuresByTask(failedTests, tasks) {
+    const feedbackMap = new Map();
+
+    failedTests.forEach(test => {
+      // Find which task this test belongs to
+      const relatedTask = tasks.find(t =>
+        test.description && t.title &&
+        (test.description.includes(t.title) || t.title.includes(test.title))
+      );
+
+      if (relatedTask) {
+        if (!feedbackMap.has(relatedTask.taskId)) {
+          feedbackMap.set(relatedTask.taskId, []);
+        }
+        feedbackMap.get(relatedTask.taskId).push(test.title);
+      }
+    });
+
+    return feedbackMap;
+  }
+
+  /**
+   * ENHANCEMENT: Create PM final approval gate with test matrix
+   */
+  async createPMFinalApproval(storyId, testMatrix) {
+    try {
+      await this.humanGateAgent.execute({
+        mode: 'create-gate',
+        data: {
+          entityType: 'user-story',
+          entityId: storyId,
+          gateType: 'final-walkthrough',
+          approvers: [
+            {
+              role: 'product-manager',
+              userId: 'pm-001',
+              name: 'Product Manager',
+              required: true
+            }
+          ],
+          checklist: [
+            `All tests passed: ${testMatrix.testSummary.passed}/${testMatrix.testSummary.total}`,
+            `Pass rate: ${testMatrix.testSummary.passRate}%`,
+            'All acceptance criteria met',
+            'Ready for production deployment'
+          ]
+        }
+      });
+
+      this.emit('pm-approval:required', {
+        storyId,
+        testMatrix
+      });
+
+      return {
+        success: true,
+        message: 'PM final approval gate created',
+        testMatrix
+      };
+
+    } catch (error) {
+      this.logger.error('PM approval gate creation failed', { error: error.message });
+      throw error;
+    }
   }
 }
 
