@@ -382,4 +382,4 @@ cd frontend && npm run dev
 
 ---
 
-**Built with ❤️ at Jio Haptik Hackathon 2025**
+**Built with ❤️ at Hackathon with Antropic**

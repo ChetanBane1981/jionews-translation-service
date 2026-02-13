@@ -449,7 +449,7 @@ npm run api:dev
 ## 🙏 **Credits**
 
 **Built by**: Human + AI (Claude Sonnet 4.5)
-**Built for**: Jio Haptik Hackathon 2025
+**Built for**: Hackathon with Antropic
 **Built in**: 2 hours
 **Built right**: Production-grade
 

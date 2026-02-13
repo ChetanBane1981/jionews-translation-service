@@ -444,7 +444,7 @@ curl http://localhost:3000/api/domains/social/categories
 **🎉 Transformation Complete. Framework is 100% Generic.**
 
 **Built by**: AI-Human Collaboration (Claude Sonnet 4.5 + Human Direction)
-**Built for**: Jio Haptik Hackathon 2025
+**Built for**: Hackathon with Antropic
 **Built in**: 2 hours (One sprint)
 **Built right**: Production-grade, extensible, documented
 

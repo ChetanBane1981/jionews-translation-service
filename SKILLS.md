@@ -619,4 +619,4 @@ The **Agent Skills System** transforms agents from simple task executors into so
 
 ---
 
-**Built with ❤️ at Jio Haptik Hackathon 2025**
+**Built with ❤️ at Hackathon with Antropic**
