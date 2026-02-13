@@ -5,17 +5,20 @@
   "main": "src/orchestrator/index.js",
   "type": "module",
   "scripts": {
-    "start": "node src/orchestrator/index.js",
-    "dev": "nodemon src/orchestrator/index.js",
-    "api": "node src/api/server.js",
-    "api:dev": "nodemon src/api/server.js",
+    "build": "tsc",
+    "start": "node dist/orchestrator/index.js",
+    "dev": "ts-node-dev --respawn src/orchestrator/index.ts",
+    "api": "node dist/api/server.js",
+    "api:dev": "ts-node-dev --respawn src/api/server.ts",
     "test": "jest",
     "test:watch": "jest --watch",
-    "agent:feed": "node src/agents/feed-agent.js",
-    "agent:detection": "node src/agents/detection-agent.js",
-    "agent:credibility": "node src/agents/credibility-agent.js",
-    "monitor": "node src/monitoring/monitor.js",
-    "db:seed": "node scripts/seed-database.js",
+    "type-check": "tsc --noEmit",
+    "lint": "eslint src --ext .ts",
+    "agent:feed": "ts-node src/agents/feed-agent.ts",
+    "agent:detection": "ts-node src/agents/detection-agent.ts",
+    "agent:credibility": "ts-node src/agents/credibility-agent.ts",
+    "monitor": "ts-node src/monitoring/monitor.ts",
+    "db:seed": "ts-node scripts/seed-database.ts",
     "docker:up": "docker-compose up -d",
     "docker:down": "docker-compose down"
   },
@@ -35,7 +38,19 @@
     "cron": "^3.1.0"
   },
   "devDependencies": {
+    "@types/node": "^20.10.0",
+    "@types/express": "^4.17.21",
+    "@types/cors": "^2.8.17",
+    "@types/bull": "^4.10.0",
+    "@typescript-eslint/eslint-plugin": "^6.15.0",
+    "@typescript-eslint/parser": "^6.15.0",
+    "typescript": "^5.3.0",
+    "ts-node": "^10.9.2",
+    "ts-node-dev": "^2.0.0",
     "nodemon": "^3.0.0",
-    "jest": "^29.7.0"
+    "jest": "^29.7.0",
+    "@types/jest": "^29.5.0",
+    "ts-jest": "^29.1.0",
+    "eslint": "^8.55.0"
   }
 }
