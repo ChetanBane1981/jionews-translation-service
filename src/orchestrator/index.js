@@ -1,4 +1,9 @@
+import dotenv from 'dotenv';
+dotenv.config();
+
 import EventEmitter from 'events';
+import { fileURLToPath } from 'url';
+import { resolve } from 'path';
 import { logger } from '../utils/logger.js';
 import { FeedAgent } from '../agents/feed-agent.js';
 import { DetectionAgent } from '../agents/detection-agent.js';
@@ -261,7 +266,10 @@ export class Orchestrator extends EventEmitter {
 }
 
 // Start orchestrator if run directly
-if (import.meta.url === `file://${process.argv[1]}`) {
+const __filename = fileURLToPath(import.meta.url);
+const isMainModule = process.argv[1] && resolve(process.argv[1]) === __filename;
+
+if (isMainModule) {
   const orchestrator = new Orchestrator();
 
   orchestrator.start().catch((error) => {

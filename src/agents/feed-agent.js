@@ -1,5 +1,6 @@
 import { BaseAgent } from './BaseAgent.js';
 import axios from 'axios';
+import Parser from 'rss-parser';
 import { logger } from '../utils/logger.js';
 
 /**
@@ -24,18 +25,17 @@ export class FeedAgent extends BaseAgent {
     // Load news sources (in production, load from DB or config)
     this.sources = [
       {
-        name: 'NewsAPI',
-        url: 'https://newsapi.org/v2/top-headlines',
-        type: 'api',
-        enabled: true
-      },
-      {
-        name: 'RSS Feed 1',
+        name: 'CNN RSS',
         url: 'http://rss.cnn.com/rss/edition.rss',
         type: 'rss',
         enabled: true
       },
-      // Add more sources as needed
+      {
+        name: 'BBC News RSS',
+        url: 'http://feeds.bbci.co.uk/news/rss.xml',
+        type: 'rss',
+        enabled: true
+      }
     ];
 
     logger.info(`[FeedAgent] Initialized with ${this.sources.length} sources`);
@@ -87,6 +87,11 @@ export class FeedAgent extends BaseAgent {
    * Fetch from API source
    */
   async fetchFromAPI(source) {
+    if (!process.env.NEWS_API_KEY || process.env.NEWS_API_KEY === 'your_newsapi_key_here') {
+      logger.warn(`[FeedAgent] NEWS_API_KEY not configured - skipping ${source.name}`);
+      return [];
+    }
+
     try {
       const response = await axios.get(source.url, {
         params: {
@@ -113,7 +118,10 @@ export class FeedAgent extends BaseAgent {
       return [];
 
     } catch (error) {
-      logger.error(`[FeedAgent] API fetch error:`, error.message);
+      logger.error(`[FeedAgent] API fetch error from ${source.name}:`, error.message);
+      if (error.response?.status === 401) {
+        logger.error(`[FeedAgent] Invalid API key for ${source.name}`);
+      }
       return [];
     }
   }
@@ -122,10 +130,39 @@ export class FeedAgent extends BaseAgent {
    * Fetch from RSS feed
    */
   async fetchFromRSS(source) {
-    // In production, use proper RSS parser
-    // For now, return mock data
-    logger.info(`[FeedAgent] RSS parsing not implemented yet for ${source.name}`);
-    return [];
+    try {
+      const parser = new Parser({
+        timeout: 10000,
+        headers: {
+          'User-Agent': 'JioNews-Sentinel/1.0'
+        }
+      });
+
+      const feed = await parser.parseURL(source.url);
+
+      if (!feed.items || feed.items.length === 0) {
+        logger.warn(`[FeedAgent] No items found in RSS feed: ${source.name}`);
+        return [];
+      }
+
+      const headlines = feed.items.slice(0, 20).map(item => ({
+        id: this.generateId(),
+        title: item.title || 'Untitled',
+        description: item.contentSnippet || item.content || item.description || '',
+        url: item.link || '',
+        imageUrl: item.enclosure?.url || item.media?.thumbnail?.url || null,
+        publishedAt: item.pubDate ? new Date(item.pubDate) : new Date(),
+        sourceName: feed.title || source.name,
+        author: item.creator || item.author || 'Unknown'
+      }));
+
+      logger.info(`[FeedAgent] Successfully parsed ${headlines.length} items from RSS feed: ${source.name}`);
+      return headlines;
+
+    } catch (error) {
+      logger.error(`[FeedAgent] RSS fetch error for ${source.name}:`, error.message);
+      return [];
+    }
   }
 
   /**
