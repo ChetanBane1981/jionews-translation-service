@@ -1,0 +1,189 @@
+version: '3.8'
+
+services:
+  # NGINX Load Balancer
+  nginx:
+    image: nginx:alpine
+    container_name: jionews-nginx
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./frontend/dist:/usr/share/nginx/html:ro
+      - nginx_logs:/var/log/nginx
+    depends_on:
+      - api1
+      - api2
+    restart: unless-stopped
+    networks:
+      - jionews-network
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # API Instance 1
+  api1:
+    build: .
+    container_name: jionews-api1
+    environment:
+      - NODE_ENV=production
+      - PORT=3000
+      - INSTANCE_ID=api1
+      - MONGODB_URI=mongodb://mongodb1:27017,mongodb2:27018/jionews-sentinel?replicaSet=rs0
+      - REDIS_URL=redis://redis-master:6379
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+      - SARVAM_API_KEY=${SARVAM_API_KEY}
+    depends_on:
+      - mongodb1
+      - redis-master
+    restart: unless-stopped
+    networks:
+      - jionews-network
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:3000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # API Instance 2
+  api2:
+    build: .
+    container_name: jionews-api2
+    environment:
+      - NODE_ENV=production
+      - PORT=3000
+      - INSTANCE_ID=api2
+      - MONGODB_URI=mongodb://mongodb1:27017,mongodb2:27018/jionews-sentinel?replicaSet=rs0
+      - REDIS_URL=redis://redis-master:6379
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+      - SARVAM_API_KEY=${SARVAM_API_KEY}
+    depends_on:
+      - mongodb1
+      - redis-master
+    restart: unless-stopped
+    networks:
+      - jionews-network
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:3000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # MongoDB Primary
+  mongodb1:
+    image: mongo:7.0
+    container_name: jionews-mongodb1
+    command: mongod --replSet rs0 --port 27017
+    ports:
+      - "27017:27017"
+    environment:
+      MONGO_INITDB_DATABASE: jionews-sentinel
+    volumes:
+      - mongodb1_data:/data/db
+      - mongodb1_config:/data/configdb
+    restart: unless-stopped
+    networks:
+      - jionews-network
+    healthcheck:
+      test: echo 'db.runCommand("ping").ok' | mongosh localhost:27017/test --quiet
+      interval: 30s
+      timeout: 10s
+      retries: 5
+
+  # MongoDB Secondary
+  mongodb2:
+    image: mongo:7.0
+    container_name: jionews-mongodb2
+    command: mongod --replSet rs0 --port 27018
+    ports:
+      - "27018:27018"
+    volumes:
+      - mongodb2_data:/data/db
+      - mongodb2_config:/data/configdb
+    restart: unless-stopped
+    networks:
+      - jionews-network
+    depends_on:
+      - mongodb1
+    healthcheck:
+      test: echo 'db.runCommand("ping").ok' | mongosh localhost:27018/test --quiet
+      interval: 30s
+      timeout: 10s
+      retries: 5
+
+  # Redis Master
+  redis-master:
+    image: redis:7-alpine
+    container_name: jionews-redis-master
+    command: redis-server --appendonly yes --maxmemory 512mb --maxmemory-policy allkeys-lru
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_master_data:/data
+    restart: unless-stopped
+    networks:
+      - jionews-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Redis Replica (Optional for HA)
+  redis-replica:
+    image: redis:7-alpine
+    container_name: jionews-redis-replica
+    command: redis-server --appendonly yes --replicaof redis-master 6379
+    depends_on:
+      - redis-master
+    volumes:
+      - redis_replica_data:/data
+    restart: unless-stopped
+    networks:
+      - jionews-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Monitoring (Optional - Prometheus)
+  # prometheus:
+  #   image: prom/prometheus:latest
+  #   container_name: jionews-prometheus
+  #   volumes:
+  #     - ./prometheus.yml:/etc/prometheus/prometheus.yml:ro
+  #     - prometheus_data:/prometheus
+  #   ports:
+  #     - "9090:9090"
+  #   networks:
+  #     - jionews-network
+
+volumes:
+  mongodb1_data:
+    driver: local
+  mongodb1_config:
+    driver: local
+  mongodb2_data:
+    driver: local
+  mongodb2_config:
+    driver: local
+  redis_master_data:
+    driver: local
+  redis_replica_data:
+    driver: local
+  nginx_logs:
+    driver: local
+  # prometheus_data:
+  #   driver: local
+
+networks:
+  jionews-network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.25.0.0/16
