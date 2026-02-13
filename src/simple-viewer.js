@@ -109,7 +109,7 @@ app.get('/', (req, res) => {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>JioNews Live Feed</title>
+    <title>JioNews Sentinel - AI-Powered News Intelligence</title>
     <style>
         * {
             margin: 0;
@@ -117,141 +117,453 @@ app.get('/', (req, res) => {
             box-sizing: border-box;
         }
         body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+            background: linear-gradient(135deg, #0f2027 0%, #203a43 50%, #2c5364 100%);
             min-height: 100vh;
-            padding: 20px;
+            padding: 0;
+        }
+        .top-bar {
+            background: rgba(0, 0, 0, 0.3);
+            backdrop-filter: blur(10px);
+            padding: 15px 0;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        .top-bar-content {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 0 30px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .logo {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+        .logo-icon {
+            width: 45px;
+            height: 45px;
+            background: linear-gradient(135deg, #0ea5e9 0%, #06b6d4 100%);
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 24px;
+            font-weight: bold;
+            color: white;
+            box-shadow: 0 4px 15px rgba(6, 182, 212, 0.3);
+        }
+        .logo-text h1 {
+            color: white;
+            font-size: 1.8em;
+            font-weight: 700;
+            letter-spacing: -0.5px;
+        }
+        .logo-text p {
+            color: rgba(255, 255, 255, 0.7);
+            font-size: 0.85em;
+            margin-top: 2px;
         }
         .container {
-            max-width: 1200px;
+            max-width: 1400px;
             margin: 0 auto;
-        }
-        header {
-            background: white;
             padding: 30px;
-            border-radius: 15px;
-            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+        }
+        .dashboard-header {
+            background: rgba(255, 255, 255, 0.05);
+            backdrop-filter: blur(20px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 20px;
+            padding: 35px;
             margin-bottom: 30px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
         }
-        h1 {
-            color: #667eea;
-            font-size: 2.5em;
-            margin-bottom: 10px;
-        }
-        .stats {
+        .header-title {
             display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 25px;
+        }
+        .header-title h2 {
+            color: white;
+            font-size: 1.6em;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+        .live-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            background: rgba(34, 197, 94, 0.2);
+            border: 1px solid rgba(34, 197, 94, 0.3);
+            padding: 8px 16px;
+            border-radius: 25px;
+            font-size: 0.85em;
+            color: #22c55e;
+            font-weight: 600;
+        }
+        .live-indicator {
+            width: 8px;
+            height: 8px;
+            background: #22c55e;
+            border-radius: 50%;
+            animation: pulse 2s infinite;
+        }
+        @keyframes pulse {
+            0%, 100% { opacity: 1; box-shadow: 0 0 0 0 rgba(34, 197, 94, 0.7); }
+            50% { opacity: 0.6; box-shadow: 0 0 0 8px rgba(34, 197, 94, 0); }
+        }
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
             gap: 20px;
             margin-top: 20px;
         }
-        .stat-box {
-            background: #f8f9fa;
-            padding: 15px 25px;
-            border-radius: 10px;
-            flex: 1;
+        .stat-card {
+            background: rgba(255, 255, 255, 0.08);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            padding: 20px;
+            border-radius: 15px;
+            transition: all 0.3s ease;
+        }
+        .stat-card:hover {
+            background: rgba(255, 255, 255, 0.12);
+            transform: translateY(-2px);
         }
         .stat-number {
-            font-size: 2em;
-            color: #667eea;
-            font-weight: bold;
+            font-size: 2.2em;
+            color: #0ea5e9;
+            font-weight: 700;
+            margin-bottom: 5px;
         }
         .stat-label {
-            color: #6c757d;
-            margin-top: 5px;
+            color: rgba(255, 255, 255, 0.7);
+            font-size: 0.9em;
+            font-weight: 500;
+        }
+        .stat-icon {
+            font-size: 1.3em;
+            margin-bottom: 10px;
         }
         .news-grid {
             display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
-            gap: 20px;
+            grid-template-columns: repeat(auto-fill, minmax(400px, 1fr));
+            gap: 25px;
         }
         .news-card {
-            background: white;
-            border-radius: 15px;
-            padding: 25px;
-            box-shadow: 0 5px 20px rgba(0,0,0,0.1);
-            transition: transform 0.3s ease, box-shadow 0.3s ease;
-            animation: fadeIn 0.5s ease-in;
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            border-radius: 20px;
+            padding: 28px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            transition: all 0.3s ease;
+            animation: fadeIn 0.6s ease-in;
         }
         .news-card:hover {
             transform: translateY(-5px);
-            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+            box-shadow: 0 12px 40px rgba(0, 0, 0, 0.3);
+            border-color: rgba(14, 165, 233, 0.3);
         }
         @keyframes fadeIn {
-            from { opacity: 0; transform: translateY(20px); }
+            from { opacity: 0; transform: translateY(30px); }
             to { opacity: 1; transform: translateY(0); }
         }
+        .card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 18px;
+        }
         .news-source {
-            display: inline-block;
-            background: #667eea;
+            display: inline-flex;
+            align-items: center;
+            background: linear-gradient(135deg, #0ea5e9 0%, #06b6d4 100%);
             color: white;
-            padding: 5px 15px;
+            padding: 6px 16px;
             border-radius: 20px;
-            font-size: 0.85em;
-            margin-bottom: 15px;
-            font-weight: 500;
+            font-size: 0.82em;
+            font-weight: 600;
+            box-shadow: 0 2px 8px rgba(14, 165, 233, 0.3);
+        }
+        .processed-badge {
+            background: linear-gradient(135deg, #22c55e 0%, #16a34a 100%);
+            color: white;
+            padding: 5px 12px;
+            border-radius: 15px;
+            font-size: 0.75em;
+            font-weight: 600;
+            box-shadow: 0 2px 8px rgba(34, 197, 94, 0.3);
         }
         .news-title {
-            font-size: 1.3em;
-            color: #2c3e50;
-            margin-bottom: 12px;
-            font-weight: 600;
-            line-height: 1.4;
-        }
-        .news-description {
-            color: #6c757d;
-            line-height: 1.6;
+            font-size: 1.35em;
+            color: #1e293b;
             margin-bottom: 15px;
+            font-weight: 700;
+            line-height: 1.5;
+        }
+        .summary-box {
+            background: linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%);
+            border-left: 4px solid #0ea5e9;
+            padding: 18px;
+            border-radius: 12px;
+            margin: 18px 0;
+            box-shadow: 0 2px 8px rgba(14, 165, 233, 0.1);
+        }
+        .summary-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 10px;
+        }
+        .summary-title {
+            color: #0369a1;
+            font-size: 0.9em;
+            font-weight: 700;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+        .word-count-badge {
+            background: #0ea5e9;
+            color: white;
+            padding: 4px 10px;
+            border-radius: 10px;
+            font-size: 0.75em;
+            font-weight: 600;
+        }
+        .summary-text {
+            color: #334155;
+            line-height: 1.7;
+            font-size: 0.95em;
+        }
+        .translation-section {
+            margin-top: 18px;
+            padding-top: 18px;
+            border-top: 2px solid #e2e8f0;
+        }
+        .translation-header {
+            color: #0369a1;
+            font-size: 0.95em;
+            font-weight: 700;
+            margin-bottom: 12px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .translation-details {
+            cursor: pointer;
+        }
+        .translation-summary {
+            color: #0ea5e9;
+            font-weight: 600;
+            font-size: 0.95em;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 10px;
+            background: rgba(14, 165, 233, 0.05);
+            border-radius: 8px;
+            transition: all 0.3s ease;
+        }
+        .translation-summary:hover {
+            background: rgba(14, 165, 233, 0.1);
+        }
+        .translation-content {
+            margin-top: 15px;
+            max-height: 500px;
+            overflow-y: auto;
+            padding-right: 10px;
+        }
+        .translation-content::-webkit-scrollbar {
+            width: 6px;
+        }
+        .translation-content::-webkit-scrollbar-track {
+            background: #f1f5f9;
+            border-radius: 10px;
+        }
+        .translation-content::-webkit-scrollbar-thumb {
+            background: #94a3b8;
+            border-radius: 10px;
+        }
+        .language-comparison {
+            background: #f8fafc;
+            padding: 18px;
+            margin: 12px 0;
+            border-radius: 12px;
+            border-left: 4px solid #0ea5e9;
+        }
+        .language-name {
+            color: #0369a1;
+            font-size: 1.1em;
+            font-weight: 700;
+            margin-bottom: 15px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .ai-translation-box {
+            background: white;
+            padding: 15px;
+            margin: 10px 0;
+            border-radius: 10px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+            border-left: 3px solid transparent;
+        }
+        .gemini-box {
+            border-left-color: #4285f4;
+        }
+        .claude-box {
+            border-left-color: #0ea5e9;
+        }
+        .ai-provider-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 10px;
+        }
+        .ai-provider-badge {
+            padding: 5px 14px;
+            border-radius: 12px;
+            font-size: 0.8em;
+            font-weight: 700;
+            color: white;
+        }
+        .gemini-badge {
+            background: linear-gradient(135deg, #4285f4 0%, #34a853 100%);
+            box-shadow: 0 2px 8px rgba(66, 133, 244, 0.3);
+        }
+        .claude-badge {
+            background: linear-gradient(135deg, #0ea5e9 0%, #06b6d4 100%);
+            box-shadow: 0 2px 8px rgba(14, 165, 233, 0.3);
+        }
+        .quality-badge {
+            font-size: 0.8em;
+            font-weight: 700;
+            padding: 3px 10px;
+            border-radius: 8px;
+        }
+        .quality-high {
+            color: #16a34a;
+            background: #dcfce7;
+        }
+        .quality-medium {
+            color: #ea580c;
+            background: #ffedd5;
+        }
+        .translation-text {
+            color: #1e293b;
+            font-size: 0.95em;
+            line-height: 1.7;
+        }
+        .comparison-note {
+            text-align: center;
+            margin-top: 12px;
+            padding: 10px;
+            background: #fef3c7;
+            border-radius: 8px;
+            border: 1px solid #fbbf24;
+        }
+        .comparison-note-text {
+            font-size: 0.85em;
+            color: #92400e;
+            font-weight: 600;
+        }
+        .language-selector {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            margin: 15px 0;
+            padding: 15px;
+            background: rgba(14, 165, 233, 0.05);
+            border-radius: 10px;
+            border: 1px solid rgba(14, 165, 233, 0.2);
+        }
+        .lang-btn {
+            padding: 8px 16px;
+            border: 2px solid #cbd5e1;
+            background: white;
+            border-radius: 20px;
+            font-size: 0.85em;
+            font-weight: 600;
+            color: #475569;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+        .lang-btn:hover {
+            border-color: #0ea5e9;
+            color: #0ea5e9;
+            transform: translateY(-2px);
+        }
+        .lang-btn.active {
+            background: linear-gradient(135deg, #0ea5e9 0%, #06b6d4 100%);
+            color: white;
+            border-color: #0ea5e9;
+            box-shadow: 0 2px 8px rgba(14, 165, 233, 0.3);
+        }
+        .language-comparison {
+            transition: all 0.3s ease;
         }
         .news-meta {
             display: flex;
             justify-content: space-between;
             align-items: center;
-            padding-top: 15px;
-            border-top: 1px solid #e9ecef;
-            font-size: 0.9em;
-            color: #6c757d;
+            padding-top: 18px;
+            margin-top: 18px;
+            border-top: 2px solid #e2e8f0;
         }
         .news-time {
-            font-style: italic;
+            color: #64748b;
+            font-size: 0.9em;
+            font-weight: 500;
         }
         .news-link {
-            background: #667eea;
+            background: linear-gradient(135deg, #0ea5e9 0%, #06b6d4 100%);
             color: white;
-            padding: 8px 20px;
+            padding: 10px 22px;
             border-radius: 20px;
             text-decoration: none;
-            transition: background 0.3s ease;
+            font-weight: 600;
+            font-size: 0.9em;
+            transition: all 0.3s ease;
+            box-shadow: 0 2px 8px rgba(14, 165, 233, 0.3);
         }
         .news-link:hover {
-            background: #764ba2;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(14, 165, 233, 0.4);
         }
         .refresh-btn {
-            background: white;
-            color: #667eea;
-            border: 2px solid #667eea;
-            padding: 12px 30px;
+            background: linear-gradient(135deg, #0ea5e9 0%, #06b6d4 100%);
+            color: white;
+            border: none;
+            padding: 14px 32px;
             border-radius: 25px;
             font-size: 1em;
-            font-weight: 600;
+            font-weight: 700;
             cursor: pointer;
             transition: all 0.3s ease;
-            margin-top: 20px;
+            box-shadow: 0 4px 15px rgba(14, 165, 233, 0.3);
         }
         .refresh-btn:hover {
-            background: #667eea;
-            color: white;
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(14, 165, 233, 0.4);
         }
-        .live-indicator {
-            display: inline-block;
-            width: 12px;
-            height: 12px;
-            background: #28a745;
-            border-radius: 50%;
-            animation: pulse 2s infinite;
-            margin-left: 10px;
+        .empty-state {
+            text-align: center;
+            padding: 80px 20px;
+            color: rgba(255, 255, 255, 0.7);
         }
-        @keyframes pulse {
-            0%, 100% { opacity: 1; }
-            50% { opacity: 0.5; }
+        .empty-state-icon {
+            font-size: 4em;
+            margin-bottom: 20px;
+        }
+        .empty-state-text {
+            font-size: 1.3em;
+            font-weight: 500;
         }
     </style>
     <script>
@@ -259,90 +571,162 @@ app.get('/', (req, res) => {
         setTimeout(() => {
             location.reload();
         }, 30000);
+
+        // Language filter functionality
+        function filterByLanguage(language, cardId) {
+            const card = document.getElementById(cardId);
+            const allLangs = card.querySelectorAll('.language-comparison');
+            const langButtons = card.querySelectorAll('.lang-btn');
+
+            // Reset all buttons
+            langButtons.forEach(btn => btn.classList.remove('active'));
+
+            if (language === 'all') {
+                // Show all languages
+                allLangs.forEach(lang => lang.style.display = 'block');
+                card.querySelector('[data-lang="all"]').classList.add('active');
+            } else {
+                // Show only selected language
+                allLangs.forEach(lang => {
+                    if (lang.dataset.language === language) {
+                        lang.style.display = 'block';
+                    } else {
+                        lang.style.display = 'none';
+                    }
+                });
+                card.querySelector(\`[data-lang="\${language}"]\`).classList.add('active');
+            }
+        }
     </script>
 </head>
 <body>
+    <div class="top-bar">
+        <div class="top-bar-content">
+            <div class="logo">
+                <div class="logo-icon">JS</div>
+                <div class="logo-text">
+                    <h1>JioNews Sentinel</h1>
+                    <p>AI-Powered News Intelligence Platform</p>
+                </div>
+            </div>
+            <div class="live-badge">
+                <span class="live-indicator"></span>
+                LIVE
+            </div>
+        </div>
+    </div>
+
     <div class="container">
-        <header>
-            <h1>🔴 JioNews Live Feed <span class="live-indicator"></span></h1>
-            <p style="color: #6c757d; margin-top: 10px; font-size: 1.1em;">
-                🔄 AI Comparison Mode • Gemini vs Claude • Real-time news from 2 publishers • Auto-refresh every 30s
+        <div class="dashboard-header">
+            <div class="header-title">
+                <h2>
+                    📊 Real-Time Analytics Dashboard
+                </h2>
+                <button class="refresh-btn" onclick="location.reload()">
+                    🔄 Refresh Now
+                </button>
+            </div>
+            <p style="color: rgba(255, 255, 255, 0.8); font-size: 1.05em; margin-bottom: 20px;">
+                Dual AI comparison • Gemini vs Claude • 8 Indian languages • 60-word summaries • Auto-refresh every 30s
             </p>
-            <div class="stats">
-                <div class="stat-box">
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <div class="stat-icon">📰</div>
                     <div class="stat-number">${newsCache.length}</div>
                     <div class="stat-label">Headlines Processed</div>
                 </div>
-                <div class="stat-box">
-                    <div class="stat-number">8x2</div>
-                    <div class="stat-label">Translations (Gemini vs Claude)</div>
+                <div class="stat-card">
+                    <div class="stat-icon">🌐</div>
+                    <div class="stat-number">8×2</div>
+                    <div class="stat-label">AI Translations</div>
                 </div>
-                <div class="stat-box">
+                <div class="stat-card">
+                    <div class="stat-icon">🤖</div>
                     <div class="stat-number">2</div>
-                    <div class="stat-label">AI Models Compared</div>
+                    <div class="stat-label">AI Models</div>
                 </div>
-                <div class="stat-box">
+                <div class="stat-card">
+                    <div class="stat-icon">📝</div>
                     <div class="stat-number">60</div>
                     <div class="stat-label">Word Summaries</div>
                 </div>
-                <div class="stat-box">
+                <div class="stat-card">
+                    <div class="stat-icon">🔄</div>
                     <div class="stat-number">LIVE</div>
                     <div class="stat-label">Comparison Mode</div>
                 </div>
             </div>
-            <button class="refresh-btn" onclick="location.reload()">🔄 Refresh Now</button>
-        </header>
+        </div>
 
         <div class="news-grid">
             ${newsCache.slice(0, 20).map(news => `
                 <div class="news-card">
-                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+                    <div class="card-header">
                         <span class="news-source">${news.source || news.sourceName}</span>
-                        ${news.processed ? '<span style="background: #28a745; color: white; padding: 5px 10px; border-radius: 15px; font-size: 0.75em;">✓ PROCESSED</span>' : ''}
+                        ${news.processed ? '<span class="processed-badge">✓ PROCESSED</span>' : ''}
                     </div>
                     <div class="news-title">${news.title}</div>
 
                     ${news.aiSummary ? `
-                        <div style="background: #f8f9fa; padding: 15px; border-radius: 10px; margin: 15px 0; border-left: 4px solid #667eea;">
-                            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
-                                <strong style="color: #667eea; font-size: 0.9em;">📝 AI SUMMARY (Claude)</strong>
-                                ${news.summaryWordCount ? `<span style="background: #667eea; color: white; padding: 3px 10px; border-radius: 10px; font-size: 0.75em;">${news.summaryWordCount} words</span>` : ''}
+                        <div class="summary-box">
+                            <div class="summary-header">
+                                <span class="summary-title">📝 AI SUMMARY (Claude)</span>
+                                ${news.summaryWordCount ? `<span class="word-count-badge">${news.summaryWordCount} words</span>` : ''}
                             </div>
-                            <p style="margin-top: 8px; color: #495057; line-height: 1.6;">${news.aiSummary}</p>
+                            <p class="summary-text">${news.aiSummary}</p>
                         </div>
-                    ` : news.description ? `<div class="news-description">${news.description.substring(0, 150)}...</div>` : ''}
+                    ` : ''}
 
                     ${news.translations && news.translations.length > 0 ? `
-                        <div style="margin-top: 15px; padding-top: 15px; border-top: 1px solid #e9ecef;">
-                            <strong style="color: #667eea; font-size: 0.9em; display: block; margin-bottom: 10px;">🔄 AI TRANSLATION COMPARISON (${news.translations.length} languages)</strong>
-                            <details style="margin-top: 10px;">
-                                <summary style="cursor: pointer; color: #667eea; font-weight: 500;">Compare Gemini vs Claude →</summary>
-                                <div style="margin-top: 15px; max-height: 400px; overflow-y: auto;">
-                                    ${news.translations.slice(0, 5).map(t => `
-                                        <div style="background: #f8f9fa; padding: 15px; margin: 12px 0; border-radius: 10px; border-left: 4px solid #667eea;">
-                                            <strong style="color: #667eea; font-size: 1.1em; display: block; margin-bottom: 12px;">📍 ${t.languageName || t.language}</strong>
+                        <div class="translation-section" id="translation-${news.id || Math.random()}">
+                            <div class="translation-header">
+                                🔄 AI TRANSLATION COMPARISON (${news.translations.length} languages)
+                            </div>
+
+                            <!-- Language Selection Buttons -->
+                            <div class="language-selector">
+                                <button class="lang-btn active" data-lang="all" onclick="filterByLanguage('all', 'translation-${news.id || Math.random()}')">
+                                    🌐 All Languages
+                                </button>
+                                ${news.translations.slice(0, 8).map(t => `
+                                    <button class="lang-btn" data-lang="${t.language}" onclick="filterByLanguage('${t.language}', 'translation-${news.id || Math.random()}')">
+                                        ${t.languageName || t.language}
+                                    </button>
+                                `).join('')}
+                            </div>
+
+                            <details class="translation-details" open>
+                                <summary class="translation-summary">
+                                    📊 View AI Comparisons (Gemini vs Claude)
+                                </summary>
+                                <div class="translation-content">
+                                    ${news.translations.slice(0, 8).map(t => `
+                                        <div class="language-comparison" data-language="${t.language}">
+                                            <div class="language-name">
+                                                📍 ${t.languageName || t.language}
+                                            </div>
 
                                             <!-- Gemini Translation -->
-                                            <div style="background: white; padding: 12px; margin: 8px 0; border-radius: 8px; border-left: 3px solid #4285f4;">
-                                                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
-                                                    <span style="background: #4285f4; color: white; padding: 4px 12px; border-radius: 12px; font-size: 0.8em; font-weight: 600;">🌟 GEMINI</span>
-                                                    ${t.geminiQuality ? `<span style="font-size: 0.8em; color: ${t.geminiQuality > 90 ? '#28a745' : '#ffc107'}; font-weight: 600;">Quality: ${t.geminiQuality}%</span>` : ''}
+                                            <div class="ai-translation-box gemini-box">
+                                                <div class="ai-provider-header">
+                                                    <span class="ai-provider-badge gemini-badge">🌟 GEMINI</span>
+                                                    ${t.geminiQuality ? `<span class="quality-badge ${t.geminiQuality > 90 ? 'quality-high' : 'quality-medium'}">Quality: ${t.geminiQuality}%</span>` : ''}
                                                 </div>
-                                                <p style="color: #2c3e50; font-size: 0.95em; line-height: 1.6;">${t.geminiTranslation || t.summary || '[Not available]'}</p>
+                                                <p class="translation-text">${t.geminiTranslation || '[Not available]'}</p>
                                             </div>
 
                                             <!-- Claude Translation -->
-                                            <div style="background: white; padding: 12px; margin: 8px 0; border-radius: 8px; border-left: 3px solid #667eea;">
-                                                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
-                                                    <span style="background: #667eea; color: white; padding: 4px 12px; border-radius: 12px; font-size: 0.8em; font-weight: 600;">🤖 CLAUDE</span>
-                                                    ${t.claudeQuality ? `<span style="font-size: 0.8em; color: ${t.claudeQuality > 90 ? '#28a745' : '#ffc107'}; font-weight: 600;">Quality: ${t.claudeQuality}%</span>` : ''}
+                                            <div class="ai-translation-box claude-box">
+                                                <div class="ai-provider-header">
+                                                    <span class="ai-provider-badge claude-badge">🤖 CLAUDE</span>
+                                                    ${t.claudeQuality ? `<span class="quality-badge ${t.claudeQuality > 90 ? 'quality-high' : 'quality-medium'}">Quality: ${t.claudeQuality}%</span>` : ''}
                                                 </div>
-                                                <p style="color: #2c3e50; font-size: 0.95em; line-height: 1.6;">${t.claudeTranslation || t.summary || '[Not available]'}</p>
+                                                <p class="translation-text">${t.claudeTranslation || '[Not available]'}</p>
                                             </div>
 
                                             <!-- Comparison Note -->
-                                            <div style="text-align: center; margin-top: 10px; padding: 8px; background: #fff3cd; border-radius: 6px;">
-                                                <span style="font-size: 0.85em; color: #856404;">💡 Compare both translations above</span>
+                                            <div class="comparison-note">
+                                                <span class="comparison-note-text">💡 Compare translation quality above</span>
                                             </div>
                                         </div>
                                     `).join('')}
@@ -351,23 +735,21 @@ app.get('/', (req, res) => {
                         </div>
                     ` : ''}
 
-                    ${news.credibilityScore ? `
-                        <div style="margin-top: 10px; font-size: 0.9em;">
-                            <span style="color: ${news.credibilityScore > 75 ? '#28a745' : news.credibilityScore > 50 ? '#ffc107' : '#dc3545'};">
-                                🎯 Credibility: ${news.credibilityScore}%
-                            </span>
-                        </div>
-                    ` : ''}
 
                     <div class="news-meta">
                         <span class="news-time">⏱ ${new Date(news.fetchedAt).toLocaleTimeString()}</span>
-                        ${news.url ? `<a href="${news.url}" target="_blank" class="news-link">Read More →</a>` : ''}
+                        ${news.url ? `<a href="${news.url}" target="_blank" class="news-link">Read Full Article →</a>` : ''}
                     </div>
                 </div>
             `).join('')}
         </div>
 
-        ${newsCache.length === 0 ? '<p style="color: white; text-align: center; margin-top: 50px; font-size: 1.2em;">⏳ Waiting for news... The feed agent is fetching headlines every minute.</p>' : ''}
+        ${newsCache.length === 0 ? `
+            <div class="empty-state">
+                <div class="empty-state-icon">⏳</div>
+                <p class="empty-state-text">Initializing AI pipeline... Fetching headlines from CNN & BBC RSS feeds</p>
+            </div>
+        ` : ''}
     </div>
 </body>
 </html>

@@ -89,9 +89,11 @@ export class TranslationAgent extends BaseAgent {
 
   /**
    * Translate to a specific language using BOTH Gemini AND Claude for comparison
+   * Only translates the summary, NOT the title
    */
   async translateToLanguage(headline, targetLang) {
-    const textToTranslate = headline.summary || headline.description || headline.title;
+    // Use aiSummary or summary for translation, NOT the title
+    const textToTranslate = headline.aiSummary || headline.summary || headline.description;
     const translations = {};
 
     // Translate with Gemini
@@ -158,11 +160,11 @@ Provide ONLY the translation, no explanations or additional text.`;
       };
     }
 
-    // Return both translations for comparison
+    // Return both translations for comparison (summary only, title stays in English)
     return {
       language: targetLang.code,
       languageName: targetLang.name,
-      title: headline.title,
+      originalTitle: headline.title, // Keep title in English
       geminiTranslation: translations.gemini?.text || '[Not available]',
       claudeTranslation: translations.claude?.text || '[Not available]',
       geminiQuality: translations.gemini?.quality || 0,
