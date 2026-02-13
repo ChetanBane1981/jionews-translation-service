@@ -594,13 +594,12 @@ app.get('/', (req, res) => {
             location.reload();
         }, 30000);
 
-        // Global language filter functionality with title translation
+        // Global language filter functionality
         function filterAllByLanguage(language) {
             saveLanguage(language);
 
             const allLangs = document.querySelectorAll('.language-comparison');
             const langButtons = document.querySelectorAll('.lang-btn');
-            const newsCards = document.querySelectorAll('.news-card');
 
             // Reset all buttons
             langButtons.forEach(btn => btn.classList.remove('active'));
@@ -609,12 +608,6 @@ app.get('/', (req, res) => {
             if (language === 'all') {
                 // Show all languages
                 allLangs.forEach(lang => lang.style.display = 'block');
-                // Show original English titles
-                newsCards.forEach(card => {
-                    const titleEl = card.querySelector('.news-title');
-                    const originalTitle = titleEl.dataset.originalTitle;
-                    if (originalTitle) titleEl.textContent = originalTitle;
-                });
             } else {
                 // Show only selected language across ALL cards
                 allLangs.forEach(lang => {
@@ -622,15 +615,6 @@ app.get('/', (req, res) => {
                         lang.style.display = 'block';
                     } else {
                         lang.style.display = 'none';
-                    }
-                });
-
-                // Update titles to selected language
-                newsCards.forEach(card => {
-                    const titleEl = card.querySelector('.news-title');
-                    const translatedTitle = titleEl.dataset[\`title\${language.charAt(0).toUpperCase() + language.slice(1)}\`];
-                    if (translatedTitle) {
-                        titleEl.textContent = translatedTitle;
                     }
                 });
             }
@@ -723,16 +707,18 @@ app.get('/', (req, res) => {
                         <span class="news-source">${news.source || news.sourceName}</span>
                         ${news.processed ? '<span class="processed-badge">✓ PROCESSED</span>' : ''}
                     </div>
-                    <div class="news-title"
-                         data-original-title="${news.title}"
-                         ${news.translations ? news.translations.map(t => `data-title-${t.language}="${t.translatedTitle || news.title}"`).join(' ') : ''}>
-                        ${news.title}
-                    </div>
 
+                    <!-- English Headline -->
+                    <div style="margin-bottom: 8px;">
+                        <span style="background: linear-gradient(135deg, #64748b 0%, #475569 100%); color: white; padding: 4px 10px; border-radius: 8px; font-size: 0.75em; font-weight: 600;">🇬🇧 ENGLISH</span>
+                    </div>
+                    <div class="news-title">${news.title}</div>
+
+                    <!-- English Summary -->
                     ${news.aiSummary ? `
                         <div class="summary-box">
                             <div class="summary-header">
-                                <span class="summary-title">📝 AI SUMMARY (Claude)</span>
+                                <span class="summary-title">📝 AI SUMMARY</span>
                                 ${news.summaryWordCount ? `<span class="word-count-badge">${news.summaryWordCount} words</span>` : ''}
                             </div>
                             <p class="summary-text">${news.aiSummary}</p>
@@ -752,17 +738,26 @@ app.get('/', (req, res) => {
                                 <div class="translation-content">
                                     ${news.translations.slice(0, 8).map(t => `
                                         <div class="language-comparison" data-language="${t.language}">
-                                            <div class="language-name">
-                                                📍 ${t.languageName || t.language}
-                                            </div>
-
-                                            <!-- Claude Translation Only -->
-                                            <div class="ai-translation-box claude-box">
-                                                <div class="ai-provider-header">
-                                                    <span class="ai-provider-badge claude-badge">🤖 CLAUDE AI</span>
+                                            <div style="background: linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%); padding: 20px; border-radius: 12px; border-left: 4px solid #0ea5e9;">
+                                                <!-- Language Badge -->
+                                                <div style="margin-bottom: 15px;">
+                                                    <span class="ai-provider-badge claude-badge">📍 ${t.languageName || t.language}</span>
                                                     ${t.claudeQuality ? `<span class="quality-badge ${t.claudeQuality > 90 ? 'quality-high' : 'quality-medium'}">Quality: ${t.claudeQuality}%</span>` : ''}
                                                 </div>
-                                                <p class="translation-text">${t.claudeTranslation || '[Not available]'}</p>
+
+                                                <!-- Translated Headline -->
+                                                <div style="margin-bottom: 15px;">
+                                                    <div style="color: #0369a1; font-size: 0.85em; font-weight: 700; margin-bottom: 8px;">📰 TRANSLATED HEADLINE</div>
+                                                    <div style="font-size: 1.2em; color: #1e293b; font-weight: 700; line-height: 1.5;">
+                                                        ${t.translatedTitle || news.title}
+                                                    </div>
+                                                </div>
+
+                                                <!-- Translated Summary -->
+                                                <div>
+                                                    <div style="color: #0369a1; font-size: 0.85em; font-weight: 700; margin-bottom: 8px;">📝 TRANSLATED SUMMARY</div>
+                                                    <p class="translation-text">${t.claudeTranslation || '[Not available]'}</p>
+                                                </div>
                                             </div>
                                         </div>
                                     `).join('')}
