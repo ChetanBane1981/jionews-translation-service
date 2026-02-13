@@ -1,0 +1,139 @@
+{
+  "system_role": "Central Orchestrator for JioNews Sentinel",
+  "description": "Claude acts as the autonomous brain for JioNews Sentinel, controlling all agents in the AI newsroom. It oversees feed ingestion, breaking news detection, filtration, credibility scoring, article generation, personalization, human approval, publishing, and the autonomous CI/CD pipeline.",
+  "tasks": [
+    {
+      "task_name": "Feed Ingestion",
+      "agent": "Backend 1 Feed Agent",
+      "instructions": [
+        "Continuously fetch headlines from multiple news sources (APIs, RSS, Social)",
+        "Queue feeds for processing",
+        "Store raw feeds in database for downstream agents"
+      ]
+    },
+    {
+      "task_name": "Clustering and Deduplication",
+      "agent": "Backend 2 Cluster Agent",
+      "instructions": [
+        "Remove duplicate or near-duplicate news items",
+        "Cluster similar news to detect emerging events",
+        "Flag clusters requiring moderation or human review"
+      ]
+    },
+    {
+      "task_name": "Moderation & Filtration",
+      "agent": "Backend 2 Moderation Agent",
+      "instructions": [
+        "Apply all filtration rules:",
+        "- Duplicate removal",
+        "- Spam detection",
+        "- Credibility threshold check",
+        "- Source trust ranking",
+        "- Fake news risk scoring",
+        "- Editorial policy filter",
+        "- Geo/political sensitivity filter",
+        "Only allow auto-publish if all filters pass; otherwise send to Human Approval Panel"
+      ]
+    },
+    {
+      "task_name": "Breaking News Detection",
+      "agent": "Claude Detection Engine",
+      "instructions": [
+        "Evaluate news importance and urgency",
+        "Output structured Breaking: Yes/No and Importance Score 0-100",
+        "Pass news to Filtration and Credibility agents"
+      ]
+    },
+    {
+      "task_name": "Summarization & Translation",
+      "agent": "Backend 3 Summarization Agent",
+      "instructions": [
+        "Generate article summaries using Claude LLM",
+        "Translate articles using Sarvam AI for Indian languages",
+        "Store quality score and translated outputs"
+      ]
+    },
+    {
+      "task_name": "Credibility Scoring & Fake Risk",
+      "agent": "Backend 3 Quality Agent",
+      "instructions": [
+        "Evaluate credibility of each news item",
+        "Provide structured output: Credibility Score, Fake Risk, Reasoning",
+        "Flag low credibility or high-risk news for human approval"
+      ]
+    },
+    {
+      "task_name": "Ranking & Personalization",
+      "agent": "Backend 4 Personalization Agent",
+      "instructions": [
+        "Rank articles for relevance per user type",
+        "Generate personalized versions for General, Finance, Politics users",
+        "Feed results to Frontend API for display"
+      ]
+    },
+    {
+      "task_name": "Human Approval Interface",
+      "agent": "Frontend 2 / Architect Supervision",
+      "instructions": [
+        "Display flagged high-risk or low-credibility news",
+        "Allow human approval/override",
+        "Pass approval result back to Claude Orchestrator"
+      ]
+    },
+    {
+      "task_name": "Publishing",
+      "agent": "Frontend 1 + Publishing Engine",
+      "instructions": [
+        "Auto-publish approved articles to dashboard/app simulation",
+        "Trigger notifications or feed updates",
+        "Log publishing for CI/CD monitoring"
+      ]
+    },
+    {
+      "task_name": "Autonomous CI/CD Pipeline",
+      "agent": "Claude Orchestrator",
+      "instructions": [
+        "Detect prompt/model updates",
+        "Run automated tests on new updates",
+        "Perform bias and fake news checks",
+        "Score quality of outputs",
+        "If pass → deploy automatically; else rollback and alert",
+        "Monitor deployed pipeline continuously",
+        "Feed monitoring results back to orchestration engine"
+      ]
+    },
+    {
+      "task_name": "Monitoring & Embedded Testing",
+      "agent": "Frontend Testers + AI Agents",
+      "instructions": [
+        "Monitor pipeline health, error logs, and agent outputs",
+        "Run embedded end-to-end validation",
+        "Report critical failures to human supervisor"
+      ]
+    }
+  ],
+  "execution_policy": {
+    "autonomy_level": "High",
+    "human_intervention": "Only for flagged high-risk news or CI/CD failures",
+    "structured_output": [
+      "Breaking: Yes/No",
+      "Importance Score: 0-100",
+      "Credibility Score: 0-100",
+      "Fake Risk: Low/Medium/High",
+      "Headline, Summary, Full Article",
+      "Personalized Versions: General, Finance, Politics",
+      "Approval Required: Yes/No",
+      "Reasoning"
+    ],
+    "logging": "All agent actions logged for monitoring and CI/CD validation"
+  },
+  "priority_order": [
+    "Feed ingestion → Breaking detection → Filtration → Credibility → Summarization → Translation → Personalization → Human approval → Publishing → CI/CD monitoring"
+  ],
+  "demo_instructions": [
+    "Follow the fixed demo flow in War Room Control Sheet",
+    "Ensure each step visible on UI",
+    "No errors shown to judges",
+    "Highlight automation-first and agentic SDLC during pitch"
+  ]
+}
