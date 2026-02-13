@@ -12,35 +12,54 @@ import { PersonalizationAgent } from '../agents/personalization-agent.js';
 import { PublishingAgent } from '../agents/publishing-agent.js';
 
 /**
- * Central Orchestrator - Claude's Brain
- * Manages all autonomous agents in the newsroom pipeline
+ * Central Orchestrator - Generic Content Processing Engine
+ * Manages all autonomous agents based on domain configuration
+ * Supports: news, ecommerce, social media, and custom domains
  */
 export class Orchestrator extends EventEmitter {
-  constructor() {
+  constructor(domainConfig = null) {
     super();
+    this.domainConfig = domainConfig; // Domain-specific configuration
     this.agents = new Map();
     this.pipeline = [];
     this.humanApprovalQueue = [];
     this.isRunning = false;
+    this.agentRegistry = this.createAgentRegistry(); // Available agent constructors
   }
 
   /**
-   * Initialize all agents
+   * Create registry of available agent types
+   * Maps agent type names to their constructors
+   */
+  createAgentRegistry() {
+    return {
+      'feed': FeedAgent,
+      'detection': DetectionAgent,
+      'cluster': ClusterAgent,
+      'moderation': ModerationAgent,
+      'credibility': CredibilityAgent,
+      'summary': SummaryAgent,
+      'translation': TranslationAgent,
+      'ranking': RankingAgent,
+      'personalization': PersonalizationAgent,
+      'publishing': PublishingAgent
+    };
+  }
+
+  /**
+   * Initialize all agents based on domain configuration
    */
   async initialize() {
-    logger.info('[Orchestrator] Initializing autonomous newsroom...');
+    const domain = this.domainConfig?.domainId || 'unknown';
+    logger.info(`[Orchestrator] Initializing for domain: ${domain}...`);
 
-    // Register all agents
-    this.registerAgent('feed', new FeedAgent());
-    this.registerAgent('detection', new DetectionAgent());
-    this.registerAgent('cluster', new ClusterAgent());
-    this.registerAgent('moderation', new ModerationAgent());
-    this.registerAgent('credibility', new CredibilityAgent());
-    this.registerAgent('summary', new SummaryAgent());
-    this.registerAgent('translation', new TranslationAgent());
-    this.registerAgent('ranking', new RankingAgent());
-    this.registerAgent('personalization', new PersonalizationAgent());
-    this.registerAgent('publishing', new PublishingAgent());
+    // If no domain config provided, use default news pipeline
+    if (!this.domainConfig) {
+      logger.warn('[Orchestrator] No domain config provided, using default news pipeline');
+      this.initializeDefaultPipeline();
+    } else {
+      this.initializeFromDomainConfig();
+    }
 
     // Initialize all agents
     for (const [name, agent] of this.agents) {
@@ -48,26 +67,102 @@ export class Orchestrator extends EventEmitter {
       this.setupAgentListeners(name, agent);
     }
 
-    // Define autonomous pipeline flow
+    // Define pipeline from registered agents
     this.definePipeline();
 
-    logger.info('[Orchestrator] All agents initialized and ready');
+    logger.info(`[Orchestrator] ${this.agents.size} agents initialized and ready`);
     this.isRunning = true;
-    this.emit('orchestrator:ready');
+    this.emit('orchestrator:ready', { domain, agentCount: this.agents.size });
   }
 
   /**
-   * Register an agent
+   * Initialize agents from domain configuration
    */
-  registerAgent(name, agent) {
-    this.agents.set(name, agent);
-    logger.info(`[Orchestrator] Registered agent: ${name}`);
+  initializeFromDomainConfig() {
+    if (!this.domainConfig.agentPipeline) {
+      logger.error('[Orchestrator] Domain config missing agentPipeline');
+      this.initializeDefaultPipeline();
+      return;
+    }
+
+    const enabledAgents = this.domainConfig.agentPipeline
+      .filter(agentDef => agentDef.enabled !== false)
+      .sort((a, b) => (a.order || 0) - (b.order || 0));
+
+    logger.info(`[Orchestrator] Loading ${enabledAgents.length} agents from domain config`);
+
+    for (const agentDef of enabledAgents) {
+      const AgentClass = this.agentRegistry[agentDef.type];
+
+      if (!AgentClass) {
+        logger.warn(`[Orchestrator] Unknown agent type: ${agentDef.type}, skipping`);
+        continue;
+      }
+
+      // Create agent instance with config and domain config
+      const agentName = agentDef.name || agentDef.type;
+      const agentInstance = new AgentClass(agentDef.config, this.domainConfig);
+
+      // Register skills if specified
+      if (agentDef.skills && Array.isArray(agentDef.skills)) {
+        logger.debug(`[Orchestrator] Agent ${agentName} will use skills: ${agentDef.skills.join(', ')}`);
+        // Skills will be registered when agent initializes
+      }
+
+      this.registerAgent(agentName, agentInstance, agentDef);
+    }
+  }
+
+  /**
+   * Initialize default news pipeline (backward compatibility)
+   */
+  initializeDefaultPipeline() {
+    logger.info('[Orchestrator] Initializing default news pipeline...');
+
+    const defaultConfig = {
+      domain: 'news',
+      thresholds: {
+        credibilityMin: 70,
+        autoPublishMin: 80
+      }
+    };
+
+    // Register all agents with default config
+    this.registerAgent('feed', new FeedAgent({}, defaultConfig));
+    this.registerAgent('detection', new DetectionAgent({}, defaultConfig));
+    this.registerAgent('cluster', new ClusterAgent({}, defaultConfig));
+    this.registerAgent('moderation', new ModerationAgent({}, defaultConfig));
+    this.registerAgent('credibility', new CredibilityAgent({}, defaultConfig));
+    this.registerAgent('summary', new SummaryAgent({}, defaultConfig));
+    this.registerAgent('translation', new TranslationAgent({}, defaultConfig));
+    this.registerAgent('ranking', new RankingAgent({}, defaultConfig));
+    this.registerAgent('personalization', new PersonalizationAgent({}, defaultConfig));
+    this.registerAgent('publishing', new PublishingAgent({}, defaultConfig));
+  }
+
+  /**
+   * Register an agent with metadata
+   * @param {string} name - Agent name
+   * @param {Object} agent - Agent instance
+   * @param {Object} metadata - Agent metadata (order, parallelizable, etc.)
+   */
+  registerAgent(name, agent, metadata = {}) {
+    this.agents.set(name, {
+      instance: agent,
+      name,
+      order: metadata.order || 0,
+      parallelizable: metadata.parallelizable || false,
+      enabled: metadata.enabled !== false
+    });
+    logger.info(`[Orchestrator] Registered agent: ${name} (order: ${metadata.order || 0})`);
   }
 
   /**
    * Setup event listeners for each agent
    */
-  setupAgentListeners(name, agent) {
+  setupAgentListeners(name, agentWrapper) {
+    const agent = agentWrapper.instance;
+
     agent.on('task:completed', (data) => {
       logger.info(`[Orchestrator] Agent ${name} completed task`);
       this.onAgentTaskComplete(name, data);
@@ -85,59 +180,70 @@ export class Orchestrator extends EventEmitter {
     agent.on('agent:critical:error', (data) => {
       this.handleCriticalError(data);
     });
+
+    agent.on('skill:executed', (data) => {
+      logger.debug(`[Orchestrator] Agent ${name} executed skill: ${data.skill}`);
+    });
   }
 
   /**
-   * Define the autonomous pipeline flow
+   * Define the pipeline flow from registered agents
+   * Respects agent order and parallelization settings
    */
   definePipeline() {
-    this.pipeline = [
-      'feed',           // 1. Ingest news feeds
-      'detection',      // 2. Detect breaking news
-      'cluster',        // 3. Deduplicate & cluster
-      'moderation',     // 4. Apply filtration rules
-      'credibility',    // 5. Score credibility & fake risk
-      'summary',        // 6. Generate summaries
-      'translation',    // 7. Translate to multiple languages
-      'ranking',        // 8. Rank and detect trending
-      'personalization',// 9. Personalize for user segments
-      'publishing'      // 10. Auto-publish or request approval
-    ];
+    // Sort agents by order
+    const sortedAgents = Array.from(this.agents.entries())
+      .filter(([_, agentWrapper]) => agentWrapper.enabled)
+      .sort(([_, a], [__, b]) => a.order - b.order);
+
+    // Build pipeline (just names for now, can be enhanced with parallel execution)
+    this.pipeline = sortedAgents.map(([name, _]) => name);
+
     logger.info('[Orchestrator] Pipeline defined:', this.pipeline);
   }
 
   /**
-   * Start the autonomous newsroom
+   * Start the autonomous processing pipeline
    */
   async start() {
     if (!this.isRunning) {
       await this.initialize();
     }
 
-    logger.info('[Orchestrator] Starting autonomous newsroom pipeline...');
+    const domain = this.domainConfig?.domainId || 'default';
+    logger.info(`[Orchestrator] Starting autonomous pipeline for domain: ${domain}...`);
 
-    // Start feed agent (continuous polling)
-    const feedAgent = this.agents.get('feed');
-    await feedAgent.startContinuousIngestion();
+    // Start feed agent (continuous polling) if available
+    const feedAgentWrapper = this.agents.get('feed');
+    if (feedAgentWrapper && feedAgentWrapper.instance.startContinuousIngestion) {
+      await feedAgentWrapper.instance.startContinuousIngestion();
+    }
 
-    this.emit('orchestrator:started');
+    this.emit('orchestrator:started', { domain });
   }
 
   /**
-   * Process news item through the entire pipeline
+   * Process content item through the entire pipeline
+   * Generic - works for any content type (news, products, social posts, etc.)
    */
-  async processThroughPipeline(newsItem) {
-    logger.info(`[Orchestrator] Processing news item: ${newsItem.id}`);
+  async processThroughPipeline(contentItem) {
+    const itemId = contentItem.id || 'unknown';
+    const itemType = contentItem.type || 'unknown';
 
-    let currentData = newsItem;
+    logger.info(`[Orchestrator] Processing ${itemType} item: ${itemId}`);
+
+    let currentData = contentItem;
+    const startTime = Date.now();
 
     for (const agentName of this.pipeline) {
-      const agent = this.agents.get(agentName);
+      const agentWrapper = this.agents.get(agentName);
 
-      if (!agent) {
-        logger.error(`[Orchestrator] Agent not found: ${agentName}`);
+      if (!agentWrapper || !agentWrapper.enabled) {
+        logger.warn(`[Orchestrator] Agent not found or disabled: ${agentName}, skipping`);
         continue;
       }
+
+      const agent = agentWrapper.instance;
 
       // Process through agent
       const result = await agent.processTask(currentData);
@@ -162,10 +268,30 @@ export class Orchestrator extends EventEmitter {
       currentData = { ...currentData, ...result.result };
     }
 
-    logger.info(`[Orchestrator] Pipeline completed successfully for: ${newsItem.id}`);
-    this.emit('pipeline:completed', currentData);
+    const processingTime = Date.now() - startTime;
+    logger.info(`[Orchestrator] Pipeline completed successfully for: ${itemId} in ${processingTime}ms`);
+    this.emit('pipeline:completed', { data: currentData, processingTime });
 
-    return { success: true, data: currentData };
+    return { success: true, data: currentData, processingTime };
+  }
+
+  /**
+   * Process multiple items in parallel (batch processing)
+   * @param {Array} items - Array of content items
+   * @returns {Promise<Array>}
+   */
+  async processBatch(items) {
+    logger.info(`[Orchestrator] Processing batch of ${items.length} items`);
+
+    const promises = items.map(item =>
+      this.processThroughPipeline(item).catch(error => ({
+        success: false,
+        error: error.message,
+        itemId: item.id
+      }))
+    );
+
+    return Promise.all(promises);
   }
 
   /**
@@ -228,21 +354,36 @@ export class Orchestrator extends EventEmitter {
   }
 
   /**
-   * Get system health status
+   * Get system health status (enhanced with domain info)
    */
   getSystemHealth() {
     const health = {
-      orchestrator: 'running',
+      orchestrator: this.isRunning ? 'running' : 'stopped',
+      domain: this.domainConfig?.domainId || 'unknown',
+      domainName: this.domainConfig?.name || 'Unknown Domain',
       agents: {},
       pipeline: this.pipeline,
-      humanApprovalQueue: this.humanApprovalQueue.length
+      humanApprovalQueue: this.humanApprovalQueue.length,
+      agentCount: this.agents.size
     };
 
-    for (const [name, agent] of this.agents) {
-      health.agents[name] = agent.getHealth();
+    for (const [name, agentWrapper] of this.agents) {
+      if (agentWrapper.enabled && agentWrapper.instance) {
+        health.agents[name] = agentWrapper.instance.getHealth();
+      }
     }
 
     return health;
+  }
+
+  /**
+   * Get agent by name
+   * @param {string} name - Agent name
+   * @returns {Object|null} - Agent instance or null
+   */
+  getAgent(name) {
+    const agentWrapper = this.agents.get(name);
+    return agentWrapper?.instance || null;
   }
 
   /**
@@ -251,8 +392,10 @@ export class Orchestrator extends EventEmitter {
   async shutdown() {
     logger.info('[Orchestrator] Shutting down...');
 
-    for (const [name, agent] of this.agents) {
-      await agent.shutdown();
+    for (const [name, agentWrapper] of this.agents) {
+      if (agentWrapper.instance && agentWrapper.instance.shutdown) {
+        await agentWrapper.instance.shutdown();
+      }
     }
 
     this.isRunning = false;

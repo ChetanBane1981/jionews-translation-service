@@ -1,0 +1,252 @@
+{
+  "domainId": "ecommerce",
+  "name": "Product Intelligence Hub",
+  "description": "AI-powered product discovery and curation system",
+  "contentType": "product",
+  "enabled": true,
+  "version": "1.0.0",
+
+  "categories": [
+    { "id": "electronics", "name": "Electronics", "icon": "📱" },
+    { "id": "fashion", "name": "Fashion", "icon": "👗" },
+    { "id": "home", "name": "Home & Kitchen", "icon": "🏠" },
+    { "id": "sports", "name": "Sports & Outdoors", "icon": "⛳" },
+    { "id": "books", "name": "Books", "icon": "📚" },
+    { "id": "beauty", "name": "Beauty & Personal Care", "icon": "💄" },
+    { "id": "toys", "name": "Toys & Games", "icon": "🎮" },
+    { "id": "other", "name": "Other", "icon": "🛒" }
+  ],
+
+  "userSegments": [
+    {
+      "id": "bargain_hunter",
+      "name": "Bargain Hunters",
+      "description": "Price-sensitive shoppers looking for deals",
+      "interests": ["electronics", "fashion", "home"]
+    },
+    {
+      "id": "tech_enthusiast",
+      "name": "Tech Enthusiasts",
+      "description": "Early adopters of new technology",
+      "interests": ["electronics", "toys"]
+    },
+    {
+      "id": "fashion_forward",
+      "name": "Fashion Forward",
+      "description": "Trend-conscious shoppers",
+      "interests": ["fashion", "beauty"]
+    }
+  ],
+
+  "agentPipeline": [
+    {
+      "type": "feed",
+      "name": "product-feed",
+      "enabled": true,
+      "order": 1,
+      "parallelizable": false,
+      "skills": ["dataValidation", "cacheManagement", "rateLimiting", "telemetry"],
+      "config": {
+        "pollIntervalMinutes": 30,
+        "maxItemsPerPoll": 100
+      }
+    },
+    {
+      "type": "detection",
+      "name": "product-classifier",
+      "enabled": true,
+      "order": 2,
+      "parallelizable": false,
+      "skills": ["sentimentAnalysis", "entityExtraction", "dataEnrichment", "telemetry"],
+      "config": {
+        "trendingProductThreshold": 85
+      }
+    },
+    {
+      "type": "cluster",
+      "name": "product-deduplicator",
+      "enabled": true,
+      "order": 3,
+      "parallelizable": false,
+      "skills": ["cacheManagement", "telemetry"],
+      "config": {
+        "similarityThreshold": 0.90
+      }
+    },
+    {
+      "type": "moderation",
+      "name": "product-moderator",
+      "enabled": true,
+      "order": 4,
+      "parallelizable": false,
+      "skills": ["dataValidation", "telemetry"],
+      "config": {
+        "filterCounterfeit": true
+      }
+    },
+    {
+      "type": "credibility",
+      "name": "review-analyzer",
+      "enabled": true,
+      "order": 5,
+      "parallelizable": false,
+      "skills": ["sentimentAnalysis", "telemetry"],
+      "config": {
+        "analyzeReviews": true
+      }
+    },
+    {
+      "type": "summary",
+      "name": "product-summarizer",
+      "enabled": true,
+      "order": 6,
+      "parallelizable": false,
+      "skills": ["rateLimiting", "cacheManagement", "errorRecovery", "telemetry"],
+      "config": {
+        "maxSummaryLength": 150
+      }
+    },
+    {
+      "type": "ranking",
+      "name": "product-ranker",
+      "enabled": true,
+      "order": 7,
+      "parallelizable": false,
+      "skills": ["dataEnrichment", "telemetry"],
+      "config": {
+        "rankByPrice": true,
+        "rankByReviews": true
+      }
+    },
+    {
+      "type": "personalization",
+      "name": "product-personalizer",
+      "enabled": true,
+      "order": 8,
+      "parallelizable": true,
+      "skills": ["cacheManagement", "dataEnrichment", "telemetry"],
+      "config": {}
+    },
+    {
+      "type": "publishing",
+      "name": "product-publisher",
+      "enabled": true,
+      "order": 9,
+      "parallelizable": false,
+      "skills": ["dataValidation", "telemetry"],
+      "config": {
+        "requireInventoryCheck": true
+      }
+    }
+  ],
+
+  "sources": [
+    {
+      "id": "api-source-1",
+      "name": "Sample Product API",
+      "url": "https://api.example.com/products",
+      "type": "api",
+      "enabled": false,
+      "trustScore": 80,
+      "pollIntervalMinutes": 30,
+      "config": {
+        "apiKey": "{{PRODUCT_API_KEY}}"
+      }
+    }
+  ],
+
+  "thresholds": {
+    "credibilityMin": 60,
+    "credibilityAutoReject": 20,
+    "importanceMin": 40,
+    "importanceHighPriority": 75,
+    "autoPublishMin": 70,
+    "requireApprovalBelow": 70,
+    "similarityThreshold": 0.90,
+    "toxicityMax": 0.5
+  },
+
+  "translation": {
+    "enabled": true,
+    "targetLanguages": [
+      { "code": "hi", "name": "Hindi", "enabled": true },
+      { "code": "ta", "name": "Tamil", "enabled": true },
+      { "code": "te", "name": "Telugu", "enabled": false }
+    ],
+    "provider": "sarvam",
+    "autoTranslate": false
+  },
+
+  "aiServices": {
+    "primary": {
+      "provider": "anthropic",
+      "model": "claude-sonnet-4-5-20250929",
+      "maxTokens": 2048,
+      "temperature": 0.5
+    }
+  },
+
+  "branding": {
+    "title": "Product Intelligence Hub",
+    "subtitle": "AI-Powered Product Discovery",
+    "logo": "/ecommerce-logo.png",
+    "primaryColor": "#ea580c",
+    "accentColor": "#dc2626"
+  },
+
+  "publishing": {
+    "autoPublish": true,
+    "scheduleEnabled": false,
+    "moderationRequired": false,
+    "approvalWorkflow": "none"
+  },
+
+  "analytics": {
+    "enabled": true,
+    "trackMetrics": ["views", "clicks", "purchases", "addToCart"],
+    "reportingInterval": "hourly"
+  },
+
+  "rateLimits": {
+    "feed": 200,
+    "detection": 100,
+    "credibility": 80,
+    "summary": 100,
+    "default": 100
+  },
+
+  "cache": {
+    "enabled": true,
+    "ttlMinutes": 120,
+    "maxSize": 2000
+  },
+
+  "customFields": [
+    {
+      "name": "price",
+      "type": "number",
+      "required": true
+    },
+    {
+      "name": "currency",
+      "type": "string",
+      "required": true,
+      "default": "INR"
+    },
+    {
+      "name": "inventory",
+      "type": "number",
+      "required": false
+    },
+    {
+      "name": "brand",
+      "type": "string",
+      "required": false
+    },
+    {
+      "name": "sku",
+      "type": "string",
+      "required": false
+    }
+  ]
+}

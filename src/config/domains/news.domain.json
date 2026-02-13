@@ -1,0 +1,289 @@
+{
+  "domainId": "news",
+  "name": "JioNews Sentinel",
+  "description": "Autonomous AI newsroom for multi-language news delivery",
+  "contentType": "news",
+  "enabled": true,
+  "version": "1.0.0",
+
+  "categories": [
+    { "id": "politics", "name": "Politics", "icon": "⚖️" },
+    { "id": "business", "name": "Business", "icon": "💼" },
+    { "id": "technology", "name": "Technology", "icon": "💻" },
+    { "id": "sports", "name": "Sports", "icon": "⚽" },
+    { "id": "entertainment", "name": "Entertainment", "icon": "🎬" },
+    { "id": "health", "name": "Health", "icon": "🏥" },
+    { "id": "science", "name": "Science", "icon": "🔬" },
+    { "id": "other", "name": "Other", "icon": "📰" }
+  ],
+
+  "userSegments": [
+    {
+      "id": "general",
+      "name": "General Audience",
+      "description": "Broad interest in various topics",
+      "interests": ["politics", "business", "technology", "sports"]
+    },
+    {
+      "id": "finance",
+      "name": "Finance Professionals",
+      "description": "Focus on business and economic news",
+      "interests": ["business", "technology", "politics"]
+    },
+    {
+      "id": "tech",
+      "name": "Tech Enthusiasts",
+      "description": "Technology and innovation focused",
+      "interests": ["technology", "science", "business"]
+    },
+    {
+      "id": "politics",
+      "name": "Political Analysts",
+      "description": "In-depth political coverage",
+      "interests": ["politics", "business"]
+    }
+  ],
+
+  "agentPipeline": [
+    {
+      "type": "feed",
+      "name": "feed",
+      "enabled": true,
+      "order": 1,
+      "parallelizable": false,
+      "skills": ["dataValidation", "cacheManagement", "rateLimiting", "telemetry"],
+      "config": {
+        "pollIntervalMinutes": 5,
+        "maxItemsPerPoll": 50
+      },
+      "retry": {
+        "enabled": true,
+        "maxAttempts": 3,
+        "backoffMs": 5000
+      }
+    },
+    {
+      "type": "detection",
+      "name": "detection",
+      "enabled": true,
+      "order": 2,
+      "parallelizable": false,
+      "skills": ["sentimentAnalysis", "entityExtraction", "dataEnrichment", "telemetry"],
+      "config": {
+        "breakingNewsThreshold": 80
+      },
+      "retry": {
+        "enabled": true,
+        "maxAttempts": 2,
+        "backoffMs": 3000
+      }
+    },
+    {
+      "type": "cluster",
+      "name": "cluster",
+      "enabled": true,
+      "order": 3,
+      "parallelizable": false,
+      "skills": ["cacheManagement", "telemetry"],
+      "config": {
+        "similarityThreshold": 0.85
+      },
+      "retry": {
+        "enabled": true,
+        "maxAttempts": 2,
+        "backoffMs": 2000
+      }
+    },
+    {
+      "type": "moderation",
+      "name": "moderation",
+      "enabled": true,
+      "order": 4,
+      "parallelizable": false,
+      "skills": ["dataValidation", "telemetry"],
+      "config": {
+        "strictMode": false
+      },
+      "retry": {
+        "enabled": false
+      }
+    },
+    {
+      "type": "credibility",
+      "name": "credibility",
+      "enabled": true,
+      "order": 5,
+      "parallelizable": false,
+      "skills": ["sentimentAnalysis", "entityExtraction", "cacheManagement", "telemetry"],
+      "config": {
+        "enableFactChecking": true
+      },
+      "retry": {
+        "enabled": true,
+        "maxAttempts": 2,
+        "backoffMs": 3000
+      }
+    },
+    {
+      "type": "summary",
+      "name": "summary",
+      "enabled": true,
+      "order": 6,
+      "parallelizable": false,
+      "skills": ["rateLimiting", "cacheManagement", "errorRecovery", "telemetry"],
+      "config": {
+        "maxSummaryLength": 200
+      },
+      "retry": {
+        "enabled": true,
+        "maxAttempts": 3,
+        "backoffMs": 5000
+      }
+    },
+    {
+      "type": "translation",
+      "name": "translation",
+      "enabled": true,
+      "order": 7,
+      "parallelizable": true,
+      "skills": ["rateLimiting", "cacheManagement", "errorRecovery", "telemetry"],
+      "config": {
+        "autoTranslate": true
+      },
+      "retry": {
+        "enabled": true,
+        "maxAttempts": 3,
+        "backoffMs": 5000
+      }
+    },
+    {
+      "type": "ranking",
+      "name": "ranking",
+      "enabled": true,
+      "order": 8,
+      "parallelizable": false,
+      "skills": ["dataEnrichment", "telemetry"],
+      "config": {
+        "trendingThreshold": 85
+      },
+      "retry": {
+        "enabled": false
+      }
+    },
+    {
+      "type": "personalization",
+      "name": "personalization",
+      "enabled": true,
+      "order": 9,
+      "parallelizable": true,
+      "skills": ["cacheManagement", "dataEnrichment", "telemetry"],
+      "config": {},
+      "retry": {
+        "enabled": false
+      }
+    },
+    {
+      "type": "publishing",
+      "name": "publishing",
+      "enabled": true,
+      "order": 10,
+      "parallelizable": false,
+      "skills": ["dataValidation", "telemetry"],
+      "config": {},
+      "retry": {
+        "enabled": true,
+        "maxAttempts": 2,
+        "backoffMs": 2000
+      }
+    }
+  ],
+
+  "sources": [
+    {
+      "id": "rss-feed-1",
+      "name": "Sample RSS Feed",
+      "url": "https://example.com/rss",
+      "type": "rss",
+      "enabled": false,
+      "trustScore": 75,
+      "pollIntervalMinutes": 10,
+      "config": {}
+    }
+  ],
+
+  "thresholds": {
+    "credibilityMin": 70,
+    "credibilityAutoReject": 30,
+    "importanceMin": 50,
+    "importanceHighPriority": 80,
+    "autoPublishMin": 80,
+    "requireApprovalBelow": 80,
+    "similarityThreshold": 0.85,
+    "toxicityMax": 0.3
+  },
+
+  "translation": {
+    "enabled": true,
+    "targetLanguages": [
+      { "code": "hi", "name": "Hindi", "enabled": true },
+      { "code": "ta", "name": "Tamil", "enabled": true },
+      { "code": "te", "name": "Telugu", "enabled": true },
+      { "code": "ml", "name": "Malayalam", "enabled": false },
+      { "code": "kn", "name": "Kannada", "enabled": false },
+      { "code": "gu", "name": "Gujarati", "enabled": false },
+      { "code": "mr", "name": "Marathi", "enabled": false },
+      { "code": "bn", "name": "Bengali", "enabled": false }
+    ],
+    "provider": "sarvam",
+    "autoTranslate": true
+  },
+
+  "aiServices": {
+    "primary": {
+      "provider": "anthropic",
+      "model": "claude-sonnet-4-5-20250929",
+      "maxTokens": 4096,
+      "temperature": 0.7
+    },
+    "fallback": {
+      "provider": "anthropic",
+      "model": "claude-haiku-4-5-20251001"
+    }
+  },
+
+  "branding": {
+    "title": "JioNews Sentinel",
+    "subtitle": "Autonomous AI Newsroom",
+    "logo": "/logo.png",
+    "primaryColor": "#2563eb",
+    "accentColor": "#7c3aed"
+  },
+
+  "publishing": {
+    "autoPublish": false,
+    "scheduleEnabled": false,
+    "moderationRequired": true,
+    "approvalWorkflow": "single"
+  },
+
+  "analytics": {
+    "enabled": true,
+    "trackMetrics": ["views", "clicks", "readTime", "shares"],
+    "reportingInterval": "daily"
+  },
+
+  "rateLimits": {
+    "feed": 120,
+    "detection": 60,
+    "credibility": 60,
+    "translation": 100,
+    "summary": 60,
+    "default": 60
+  },
+
+  "cache": {
+    "enabled": true,
+    "ttlMinutes": 60,
+    "maxSize": 1000
+  }
+}

@@ -1,0 +1,246 @@
+{
+  "domainId": "social",
+  "name": "Social Media Intelligence",
+  "description": "AI-powered social media content curation and moderation",
+  "contentType": "social_post",
+  "enabled": true,
+  "version": "1.0.0",
+
+  "categories": [
+    { "id": "trending", "name": "Trending", "icon": "🔥" },
+    { "id": "news", "name": "News & Current Events", "icon": "📰" },
+    { "id": "entertainment", "name": "Entertainment", "icon": "🎭" },
+    { "id": "sports", "name": "Sports", "icon": "⚽" },
+    { "id": "technology", "name": "Technology", "icon": "💻" },
+    { "id": "lifestyle", "name": "Lifestyle", "icon": "🌟" },
+    { "id": "memes", "name": "Memes & Humor", "icon": "😂" },
+    { "id": "other", "name": "Other", "icon": "💬" }
+  ],
+
+  "userSegments": [
+    {
+      "id": "influencer",
+      "name": "Influencers",
+      "description": "High-engagement content creators",
+      "interests": ["trending", "entertainment", "lifestyle"]
+    },
+    {
+      "id": "news_junkie",
+      "name": "News Junkies",
+      "description": "Users interested in current events",
+      "interests": ["news", "sports", "technology"]
+    },
+    {
+      "id": "casual_browser",
+      "name": "Casual Browsers",
+      "description": "Entertainment-focused users",
+      "interests": ["memes", "entertainment", "lifestyle"]
+    }
+  ],
+
+  "agentPipeline": [
+    {
+      "type": "feed",
+      "name": "social-feed",
+      "enabled": true,
+      "order": 1,
+      "parallelizable": false,
+      "skills": ["dataValidation", "cacheManagement", "rateLimiting", "telemetry"],
+      "config": {
+        "pollIntervalMinutes": 1,
+        "maxItemsPerPoll": 200
+      }
+    },
+    {
+      "type": "detection",
+      "name": "viral-detector",
+      "enabled": true,
+      "order": 2,
+      "parallelizable": false,
+      "skills": ["sentimentAnalysis", "entityExtraction", "dataEnrichment", "telemetry"],
+      "config": {
+        "viralThreshold": 90
+      }
+    },
+    {
+      "type": "cluster",
+      "name": "thread-clusterer",
+      "enabled": true,
+      "order": 3,
+      "parallelizable": false,
+      "skills": ["cacheManagement", "telemetry"],
+      "config": {
+        "similarityThreshold": 0.80
+      }
+    },
+    {
+      "type": "moderation",
+      "name": "content-moderator",
+      "enabled": true,
+      "order": 4,
+      "parallelizable": false,
+      "skills": ["sentimentAnalysis", "dataValidation", "telemetry"],
+      "config": {
+        "toxicityDetection": true,
+        "spamDetection": true,
+        "strictMode": true
+      }
+    },
+    {
+      "type": "credibility",
+      "name": "misinformation-detector",
+      "enabled": true,
+      "order": 5,
+      "parallelizable": false,
+      "skills": ["entityExtraction", "cacheManagement", "telemetry"],
+      "config": {
+        "checkFakeNews": true
+      }
+    },
+    {
+      "type": "ranking",
+      "name": "engagement-ranker",
+      "enabled": true,
+      "order": 6,
+      "parallelizable": false,
+      "skills": ["dataEnrichment", "telemetry"],
+      "config": {
+        "engagementWeight": 0.7,
+        "recencyWeight": 0.3
+      }
+    },
+    {
+      "type": "personalization",
+      "name": "feed-personalizer",
+      "enabled": true,
+      "order": 7,
+      "parallelizable": true,
+      "skills": ["cacheManagement", "dataEnrichment", "telemetry"],
+      "config": {}
+    },
+    {
+      "type": "publishing",
+      "name": "post-publisher",
+      "enabled": true,
+      "order": 8,
+      "parallelizable": false,
+      "skills": ["dataValidation", "telemetry"],
+      "config": {
+        "autoPublish": true
+      }
+    }
+  ],
+
+  "sources": [
+    {
+      "id": "api-source-1",
+      "name": "Sample Social API",
+      "url": "https://api.example.com/posts",
+      "type": "api",
+      "enabled": false,
+      "trustScore": 70,
+      "pollIntervalMinutes": 1,
+      "config": {
+        "apiKey": "{{SOCIAL_API_KEY}}"
+      }
+    }
+  ],
+
+  "thresholds": {
+    "credibilityMin": 50,
+    "credibilityAutoReject": 10,
+    "importanceMin": 30,
+    "importanceHighPriority": 85,
+    "autoPublishMin": 60,
+    "requireApprovalBelow": 40,
+    "similarityThreshold": 0.80,
+    "toxicityMax": 0.5
+  },
+
+  "translation": {
+    "enabled": false,
+    "targetLanguages": [],
+    "provider": "anthropic",
+    "autoTranslate": false
+  },
+
+  "aiServices": {
+    "primary": {
+      "provider": "anthropic",
+      "model": "claude-haiku-4-5-20251001",
+      "maxTokens": 1024,
+      "temperature": 0.3
+    }
+  },
+
+  "branding": {
+    "title": "Social Media Intelligence",
+    "subtitle": "AI-Powered Content Curation",
+    "logo": "/social-logo.png",
+    "primaryColor": "#6366f1",
+    "accentColor": "#ec4899"
+  },
+
+  "publishing": {
+    "autoPublish": true,
+    "scheduleEnabled": false,
+    "moderationRequired": true,
+    "approvalWorkflow": "none"
+  },
+
+  "analytics": {
+    "enabled": true,
+    "trackMetrics": ["views", "likes", "shares", "comments", "engagement"],
+    "reportingInterval": "realtime"
+  },
+
+  "rateLimits": {
+    "feed": 300,
+    "detection": 200,
+    "moderation": 200,
+    "credibility": 150,
+    "default": 150
+  },
+
+  "cache": {
+    "enabled": true,
+    "ttlMinutes": 30,
+    "maxSize": 5000
+  },
+
+  "customFields": [
+    {
+      "name": "platform",
+      "type": "string",
+      "required": true
+    },
+    {
+      "name": "likes",
+      "type": "number",
+      "required": false,
+      "default": 0
+    },
+    {
+      "name": "shares",
+      "type": "number",
+      "required": false,
+      "default": 0
+    },
+    {
+      "name": "comments",
+      "type": "number",
+      "required": false,
+      "default": 0
+    },
+    {
+      "name": "hashtags",
+      "type": "array",
+      "required": false
+    },
+    {
+      "name": "mentions",
+      "type": "array",
+      "required": false
+    }
+  ]
+}
