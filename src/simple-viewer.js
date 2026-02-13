@@ -580,15 +580,27 @@ app.get('/', (req, res) => {
         }
     </style>
     <script>
-        // Auto-refresh every 30 seconds
+        // Save and load selected language
+        function getCurrentLanguage() {
+            return localStorage.getItem('selectedLanguage') || 'all';
+        }
+
+        function saveLanguage(language) {
+            localStorage.setItem('selectedLanguage', language);
+        }
+
+        // Auto-refresh every 30 seconds, preserving language selection
         setTimeout(() => {
             location.reload();
         }, 30000);
 
-        // Global language filter functionality
+        // Global language filter functionality with title translation
         function filterAllByLanguage(language) {
+            saveLanguage(language);
+
             const allLangs = document.querySelectorAll('.language-comparison');
             const langButtons = document.querySelectorAll('.lang-btn');
+            const newsCards = document.querySelectorAll('.news-card');
 
             // Reset all buttons
             langButtons.forEach(btn => btn.classList.remove('active'));
@@ -597,6 +609,12 @@ app.get('/', (req, res) => {
             if (language === 'all') {
                 // Show all languages
                 allLangs.forEach(lang => lang.style.display = 'block');
+                // Show original English titles
+                newsCards.forEach(card => {
+                    const titleEl = card.querySelector('.news-title');
+                    const originalTitle = titleEl.dataset.originalTitle;
+                    if (originalTitle) titleEl.textContent = originalTitle;
+                });
             } else {
                 // Show only selected language across ALL cards
                 allLangs.forEach(lang => {
@@ -606,8 +624,23 @@ app.get('/', (req, res) => {
                         lang.style.display = 'none';
                     }
                 });
+
+                // Update titles to selected language
+                newsCards.forEach(card => {
+                    const titleEl = card.querySelector('.news-title');
+                    const translatedTitle = titleEl.dataset[\`title\${language.charAt(0).toUpperCase() + language.slice(1)}\`];
+                    if (translatedTitle) {
+                        titleEl.textContent = translatedTitle;
+                    }
+                });
             }
         }
+
+        // Apply saved language on page load
+        window.addEventListener('DOMContentLoaded', function() {
+            const savedLang = getCurrentLanguage();
+            filterAllByLanguage(savedLang);
+        });
     </script>
 </head>
 <body>
@@ -690,7 +723,11 @@ app.get('/', (req, res) => {
                         <span class="news-source">${news.source || news.sourceName}</span>
                         ${news.processed ? '<span class="processed-badge">✓ PROCESSED</span>' : ''}
                     </div>
-                    <div class="news-title">${news.title}</div>
+                    <div class="news-title"
+                         data-original-title="${news.title}"
+                         ${news.translations ? news.translations.map(t => `data-title-${t.language}="${t.translatedTitle || news.title}"`).join(' ') : ''}>
+                        ${news.title}
+                    </div>
 
                     ${news.aiSummary ? `
                         <div class="summary-box">

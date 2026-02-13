@@ -88,12 +88,13 @@ export class TranslationAgent extends BaseAgent {
   }
 
   /**
-   * Translate to a specific language using BOTH Gemini AND Claude for comparison
-   * Only translates the summary, NOT the title
+   * Translate to a specific language using Claude
+   * Translates both title and summary
    */
   async translateToLanguage(headline, targetLang) {
-    // Use aiSummary or summary for translation, NOT the title
-    const textToTranslate = headline.aiSummary || headline.summary || headline.description;
+    // Translate both title and summary
+    const titleToTranslate = headline.title;
+    const summaryToTranslate = headline.aiSummary || headline.summary || headline.description;
     const translations = {};
 
     // Translate with Gemini
@@ -128,24 +129,45 @@ export class TranslationAgent extends BaseAgent {
       }
     }
 
-    // Translate with Claude
+    // Translate title with Claude
+    let translatedTitle = '[Translation unavailable]';
     try {
-      const prompt = `Translate the following English news text to ${targetLang.name} (${targetLang.code}):
+      const titlePrompt = `Translate this English news headline to ${targetLang.name} (${targetLang.code}):
 
-"${textToTranslate}"
+"${titleToTranslate}"
+
+Provide ONLY the translated headline, no explanations.`;
+
+      const titleResponse = await this.anthropic.messages.create({
+        model: this.config.model,
+        max_tokens: 256,
+        messages: [{ role: 'user', content: titlePrompt }]
+      });
+
+      translatedTitle = titleResponse.content[0].text.trim();
+    } catch (error) {
+      logger.error(`[TranslationAgent] Claude title error for ${targetLang.name}:`, error.message);
+    }
+
+    // Translate summary with Claude
+    try {
+      const summaryPrompt = `Translate the following English news summary to ${targetLang.name} (${targetLang.code}):
+
+"${summaryToTranslate}"
 
 Provide ONLY the translation, no explanations or additional text.`;
 
       const response = await this.anthropic.messages.create({
         model: this.config.model,
         max_tokens: 512,
-        messages: [{ role: 'user', content: prompt }]
+        messages: [{ role: 'user', content: summaryPrompt }]
       });
 
       const translatedText = response.content[0].text.trim();
 
       translations.claude = {
         text: translatedText,
+        title: translatedTitle,
         quality: 95,
         provider: 'claude'
       };
@@ -154,22 +176,21 @@ Provide ONLY the translation, no explanations or additional text.`;
       logger.error(`[TranslationAgent] Claude error for ${targetLang.name}:`, error.message);
       translations.claude = {
         text: '[Claude unavailable]',
+        title: translatedTitle,
         quality: 0,
         provider: 'claude',
         error: true
       };
     }
 
-    // Return both translations for comparison (summary only, title stays in English)
+    // Return translations with both title and summary
     return {
       language: targetLang.code,
       languageName: targetLang.name,
-      originalTitle: headline.title, // Keep title in English
-      geminiTranslation: translations.gemini?.text || '[Not available]',
+      originalTitle: headline.title,
+      translatedTitle: translations.claude?.title || headline.title,
       claudeTranslation: translations.claude?.text || '[Not available]',
-      geminiQuality: translations.gemini?.quality || 0,
-      claudeQuality: translations.claude?.quality || 0,
-      comparison: true
+      claudeQuality: translations.claude?.quality || 0
     };
   }
 
