@@ -473,37 +473,50 @@ app.get('/', (req, res) => {
             color: #92400e;
             font-weight: 600;
         }
-        .language-selector {
+        .global-language-selector {
             display: flex;
             flex-wrap: wrap;
+            gap: 10px;
+            align-items: center;
+            margin-top: 20px;
+            padding: 20px;
+            background: rgba(255, 255, 255, 0.08);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.15);
+            border-radius: 15px;
+        }
+        .selector-label {
+            color: white;
+            font-weight: 700;
+            font-size: 1em;
+            margin-right: 10px;
+            display: flex;
+            align-items: center;
             gap: 8px;
-            margin: 15px 0;
-            padding: 15px;
-            background: rgba(14, 165, 233, 0.05);
-            border-radius: 10px;
-            border: 1px solid rgba(14, 165, 233, 0.2);
         }
         .lang-btn {
-            padding: 8px 16px;
-            border: 2px solid #cbd5e1;
-            background: white;
-            border-radius: 20px;
-            font-size: 0.85em;
+            padding: 10px 20px;
+            border: 2px solid rgba(255, 255, 255, 0.3);
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(5px);
+            border-radius: 25px;
+            font-size: 0.9em;
             font-weight: 600;
-            color: #475569;
+            color: white;
             cursor: pointer;
             transition: all 0.3s ease;
         }
         .lang-btn:hover {
             border-color: #0ea5e9;
-            color: #0ea5e9;
+            background: rgba(14, 165, 233, 0.2);
             transform: translateY(-2px);
         }
         .lang-btn.active {
             background: linear-gradient(135deg, #0ea5e9 0%, #06b6d4 100%);
             color: white;
             border-color: #0ea5e9;
-            box-shadow: 0 2px 8px rgba(14, 165, 233, 0.3);
+            box-shadow: 0 4px 15px rgba(14, 165, 233, 0.4);
+            transform: translateY(-2px);
         }
         .language-comparison {
             transition: all 0.3s ease;
@@ -572,21 +585,20 @@ app.get('/', (req, res) => {
             location.reload();
         }, 30000);
 
-        // Language filter functionality
-        function filterByLanguage(language, cardId) {
-            const card = document.getElementById(cardId);
-            const allLangs = card.querySelectorAll('.language-comparison');
-            const langButtons = card.querySelectorAll('.lang-btn');
+        // Global language filter functionality
+        function filterAllByLanguage(language) {
+            const allLangs = document.querySelectorAll('.language-comparison');
+            const langButtons = document.querySelectorAll('.lang-btn');
 
             // Reset all buttons
             langButtons.forEach(btn => btn.classList.remove('active'));
+            document.querySelectorAll(\`[data-lang="\${language}"]\`).forEach(btn => btn.classList.add('active'));
 
             if (language === 'all') {
                 // Show all languages
                 allLangs.forEach(lang => lang.style.display = 'block');
-                card.querySelector('[data-lang="all"]').classList.add('active');
             } else {
-                // Show only selected language
+                // Show only selected language across ALL cards
                 allLangs.forEach(lang => {
                     if (lang.dataset.language === language) {
                         lang.style.display = 'block';
@@ -594,7 +606,6 @@ app.get('/', (req, res) => {
                         lang.style.display = 'none';
                     }
                 });
-                card.querySelector(\`[data-lang="\${language}"]\`).classList.add('active');
             }
         }
     </script>
@@ -627,7 +638,7 @@ app.get('/', (req, res) => {
                 </button>
             </div>
             <p style="color: rgba(255, 255, 255, 0.8); font-size: 1.05em; margin-bottom: 20px;">
-                Dual AI comparison • Gemini vs Claude • 8 Indian languages • 60-word summaries • Auto-refresh every 30s
+                AI-powered translations • 8 Indian languages • 60-word summaries • Real-time news feeds • Auto-refresh every 30s
             </p>
             <div class="stats-grid">
                 <div class="stat-card">
@@ -637,13 +648,13 @@ app.get('/', (req, res) => {
                 </div>
                 <div class="stat-card">
                     <div class="stat-icon">🌐</div>
-                    <div class="stat-number">8×2</div>
-                    <div class="stat-label">AI Translations</div>
+                    <div class="stat-number">8</div>
+                    <div class="stat-label">Languages</div>
                 </div>
                 <div class="stat-card">
                     <div class="stat-icon">🤖</div>
-                    <div class="stat-number">2</div>
-                    <div class="stat-label">AI Models</div>
+                    <div class="stat-number">Claude AI</div>
+                    <div class="stat-label">Translation Engine</div>
                 </div>
                 <div class="stat-card">
                     <div class="stat-icon">📝</div>
@@ -653,8 +664,22 @@ app.get('/', (req, res) => {
                 <div class="stat-card">
                     <div class="stat-icon">🔄</div>
                     <div class="stat-number">LIVE</div>
-                    <div class="stat-label">Comparison Mode</div>
+                    <div class="stat-label">Auto-Refresh</div>
                 </div>
+            </div>
+
+            <!-- Global Language Selector -->
+            <div class="global-language-selector">
+                <span class="selector-label">🌐 Select Language:</span>
+                <button class="lang-btn active" data-lang="all" onclick="filterAllByLanguage('all')">All Languages</button>
+                <button class="lang-btn" data-lang="hi" onclick="filterAllByLanguage('hi')">Hindi</button>
+                <button class="lang-btn" data-lang="ta" onclick="filterAllByLanguage('ta')">Tamil</button>
+                <button class="lang-btn" data-lang="te" onclick="filterAllByLanguage('te')">Telugu</button>
+                <button class="lang-btn" data-lang="bn" onclick="filterAllByLanguage('bn')">Bengali</button>
+                <button class="lang-btn" data-lang="mr" onclick="filterAllByLanguage('mr')">Marathi</button>
+                <button class="lang-btn" data-lang="gu" onclick="filterAllByLanguage('gu')">Gujarati</button>
+                <button class="lang-btn" data-lang="kn" onclick="filterAllByLanguage('kn')">Kannada</button>
+                <button class="lang-btn" data-lang="ml" onclick="filterAllByLanguage('ml')">Malayalam</button>
             </div>
         </div>
 
@@ -678,26 +703,14 @@ app.get('/', (req, res) => {
                     ` : ''}
 
                     ${news.translations && news.translations.length > 0 ? `
-                        <div class="translation-section" id="translation-${news.id || Math.random()}">
+                        <div class="translation-section">
                             <div class="translation-header">
-                                🔄 AI TRANSLATION COMPARISON (${news.translations.length} languages)
-                            </div>
-
-                            <!-- Language Selection Buttons -->
-                            <div class="language-selector">
-                                <button class="lang-btn active" data-lang="all" onclick="filterByLanguage('all', 'translation-${news.id || Math.random()}')">
-                                    🌐 All Languages
-                                </button>
-                                ${news.translations.slice(0, 8).map(t => `
-                                    <button class="lang-btn" data-lang="${t.language}" onclick="filterByLanguage('${t.language}', 'translation-${news.id || Math.random()}')">
-                                        ${t.languageName || t.language}
-                                    </button>
-                                `).join('')}
+                                🌐 AI TRANSLATIONS (${news.translations.length} languages)
                             </div>
 
                             <details class="translation-details" open>
                                 <summary class="translation-summary">
-                                    📊 View AI Comparisons (Gemini vs Claude)
+                                    📊 View Translations (Claude AI)
                                 </summary>
                                 <div class="translation-content">
                                     ${news.translations.slice(0, 8).map(t => `
@@ -706,27 +719,13 @@ app.get('/', (req, res) => {
                                                 📍 ${t.languageName || t.language}
                                             </div>
 
-                                            <!-- Gemini Translation -->
-                                            <div class="ai-translation-box gemini-box">
-                                                <div class="ai-provider-header">
-                                                    <span class="ai-provider-badge gemini-badge">🌟 GEMINI</span>
-                                                    ${t.geminiQuality ? `<span class="quality-badge ${t.geminiQuality > 90 ? 'quality-high' : 'quality-medium'}">Quality: ${t.geminiQuality}%</span>` : ''}
-                                                </div>
-                                                <p class="translation-text">${t.geminiTranslation || '[Not available]'}</p>
-                                            </div>
-
-                                            <!-- Claude Translation -->
+                                            <!-- Claude Translation Only -->
                                             <div class="ai-translation-box claude-box">
                                                 <div class="ai-provider-header">
-                                                    <span class="ai-provider-badge claude-badge">🤖 CLAUDE</span>
+                                                    <span class="ai-provider-badge claude-badge">🤖 CLAUDE AI</span>
                                                     ${t.claudeQuality ? `<span class="quality-badge ${t.claudeQuality > 90 ? 'quality-high' : 'quality-medium'}">Quality: ${t.claudeQuality}%</span>` : ''}
                                                 </div>
                                                 <p class="translation-text">${t.claudeTranslation || '[Not available]'}</p>
-                                            </div>
-
-                                            <!-- Comparison Note -->
-                                            <div class="comparison-note">
-                                                <span class="comparison-note-text">💡 Compare translation quality above</span>
                                             </div>
                                         </div>
                                     `).join('')}
